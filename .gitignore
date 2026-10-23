@@ -1,0 +1,54 @@
+# Virtual Environment
+venv/
+.venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+*.egg
+
+# Jupyter Notebooks checkpoints
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
+
+# Environment variables / secrets
+.env
+*.env
+config.local.yaml
+
+# IDE / Editor
+.vscode/
+.idea/
+*.code-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Model weights (usually large files)
+*.h5
+*.pt
+*.pth
+*.ckpt
+*.pkl
+models/*.h5
+models/*.pt
+models/*.pth
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
