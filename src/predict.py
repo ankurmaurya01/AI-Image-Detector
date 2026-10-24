@@ -57,11 +57,17 @@ class DetectorPredictor:
             saved_config["model"] = dict(saved_config["model"])
             saved_config["model"]["pretrained"] = False
         self.model = build_model(saved_config)
+        self.model.eval()
 
-        if "model_state_dict" in checkpoint:
-            self.model.load_state_dict(checkpoint["model_state_dict"])
-        else:
-            self.model.load_state_dict(checkpoint)
+        state_dict = checkpoint["model_state_dict"] if "model_state_dict" in checkpoint else checkpoint
+        
+        # Detect if weights are in half-precision (bfloat16) to conserve RAM
+        is_bf16 = any(v.dtype == torch.bfloat16 for v in state_dict.values())
+        if is_bf16:
+            self.model = self.model.to(torch.bfloat16)
+        self.is_bf16 = is_bf16
+
+        self.model.load_state_dict(state_dict)
 
         # Class mapping
         self.class_to_idx = checkpoint.get(
@@ -71,7 +77,7 @@ class DetectorPredictor:
         self.idx_to_class = {v: k for k, v in self.class_to_idx.items()}
 
         # Free checkpoint memory immediately
-        del checkpoint
+        del checkpoint, state_dict
         import gc
         gc.collect()
 
@@ -106,10 +112,12 @@ class DetectorPredictor:
 
         # Preprocess and add batch dimension (1, C, H, W)
         img_tensor = self.transform(pil_img).unsqueeze(0).to(self.device)
+        if getattr(self, "is_bf16", False):
+            img_tensor = img_tensor.to(torch.bfloat16)
 
         with torch.inference_mode():
             outputs = self.model(img_tensor)
-            probs = torch.softmax(outputs, dim=1).squeeze(0).cpu().numpy()
+            probs = torch.softmax(outputs.float(), dim=1).squeeze(0).cpu().numpy()
 
         pred_idx = int(torch.argmax(outputs, dim=1).item())
         raw_class = self.idx_to_class.get(pred_idx, "unknown")
