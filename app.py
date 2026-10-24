@@ -10,6 +10,7 @@ import json
 import os
 import sys
 import tempfile
+import threading
 import webbrowser
 from flask import Flask, request, jsonify, render_template_string
 
@@ -36,8 +37,9 @@ HOST = "0.0.0.0"
 config = load_config("config.yaml")
 weights_path = "models/inference_model.pth" if os.path.exists("models/inference_model.pth") else config["paths"].get("best_model_path", "models/best_model.pth")
 
-# Global predictor reference
+# Global predictor reference & lock for handling concurrent users without RAM multiplication
 _predictor = None
+_predict_lock = threading.Lock()
 
 def get_model():
     global _predictor
@@ -564,7 +566,9 @@ def predict():
     file.save(tmp_path)
 
     try:
-        result = pred.predict(tmp_path)
+        # Serialized inference: multiple users queue smoothly instead of spiking RAM beyond 512MB
+        with _predict_lock:
+            result = pred.predict(tmp_path)
         gc.collect()
         return jsonify(result)
     except Exception as e:
