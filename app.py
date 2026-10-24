@@ -20,8 +20,8 @@ from src.predict import DetectorPredictor
 from src.gradcam import GradCAM
 from src.data_loader import safe_image_loader, get_transforms
 
-PORT = 5000
-HOST = "127.0.0.1"
+PORT = int(os.environ.get("PORT", 5000))
+HOST = "0.0.0.0"
 
 # Initialize model predictor
 config = load_config("config.yaml")
