@@ -586,8 +586,10 @@ def predict():
     try:
         result = pred.predict(tmp_path)
 
-        # Generate Grad-CAM Explainable AI Heatmap
-        if cam is not None:
+        # Grad-CAM requires backprop which exceeds Render's 512MB RAM limit.
+        # It can be enabled on servers with >= 1GB RAM by setting ENABLE_GRADCAM=1
+        enable_gradcam = os.environ.get("ENABLE_GRADCAM", "0").lower() in ("1", "true", "yes")
+        if cam is not None and enable_gradcam:
             try:
                 pil_img = safe_image_loader(tmp_path)
                 tensor = pred.transform(pil_img).unsqueeze(0).to(pred.device)
@@ -600,6 +602,7 @@ def predict():
             except Exception as ge:
                 print(f"[WARNING] Grad-CAM generation error: {ge}")
 
+        gc.collect()
         return jsonify(result)
     except Exception as e:
         import traceback

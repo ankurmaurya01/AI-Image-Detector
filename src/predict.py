@@ -107,7 +107,7 @@ class DetectorPredictor:
         # Preprocess and add batch dimension (1, C, H, W)
         img_tensor = self.transform(pil_img).unsqueeze(0).to(self.device)
 
-        with torch.no_grad():
+        with torch.inference_mode():
             outputs = self.model(img_tensor)
             probs = torch.softmax(outputs, dim=1).squeeze(0).cpu().numpy()
 
