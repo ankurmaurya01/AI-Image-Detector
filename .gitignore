@@ -43,6 +43,7 @@ Thumbs.db
 models/*.h5
 models/*.pt
 models/*.pth
+!models/inference_model.pth
 
 # Database files
 *.db

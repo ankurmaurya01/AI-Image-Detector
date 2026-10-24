@@ -37,6 +37,9 @@ HOST = "0.0.0.0"
 
 config = load_config("config.yaml")
 weights_path = config["paths"].get("best_model_path", "models/best_model.pth")
+if not os.path.exists(weights_path) and os.path.exists("models/inference_model.pth"):
+    weights_path = "models/inference_model.pth"
+
 MODEL_URL = os.environ.get(
     "MODEL_URL",
     "https://github.com/ankurmaurya01/AI-Image-Detector/releases/download/v1.0.0/best_model.pth"

@@ -63,6 +63,13 @@ class DetectorPredictor:
         else:
             self.model.load_state_dict(checkpoint)
 
+        # Class mapping
+        self.class_to_idx = checkpoint.get(
+            "class_to_idx",
+            config["dataset"].get("class_to_idx", {"real": 0, "fake": 1}),
+        ) if isinstance(checkpoint, dict) else config["dataset"].get("class_to_idx", {"real": 0, "fake": 1})
+        self.idx_to_class = {v: k for k, v in self.class_to_idx.items()}
+
         # Free checkpoint memory immediately
         del checkpoint
         import gc
@@ -72,13 +79,6 @@ class DetectorPredictor:
         self.model.eval()
 
         self.transform = get_transforms(config, split="test")
-
-        # Class mapping
-        self.class_to_idx = checkpoint.get(
-            "class_to_idx",
-            config["dataset"].get("class_to_idx", {"real": 0, "fake": 1}),
-        )
-        self.idx_to_class = {v: k for k, v in self.class_to_idx.items()}
 
     def predict(self, image_path: str) -> Dict[str, Any]:
         """
