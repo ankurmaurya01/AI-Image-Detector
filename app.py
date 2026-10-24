@@ -1,18 +1,16 @@
 """
 AI-Generated Image Detector - Web GUI Application
-Lightweight, standalone web interface running on Python's built-in HTTP server.
-Requires no external web framework (Flask/FastAPI/Gradio) - works out-of-the-box.
+Flask web application compatible with local execution and cloud serverless platforms (Vercel).
 """
 
 import base64
-from http.server import HTTPServer, BaseHTTPRequestHandler
 import io
 import json
 import os
 import sys
 import tempfile
-import urllib.parse
 import webbrowser
+from flask import Flask, request, jsonify, render_template_string
 
 # Add current directory to path
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
@@ -467,109 +465,70 @@ HTML_PAGE = """<!DOCTYPE html>
 </html>
 """
 
+app = Flask(__name__)
+application = app  # WSGI compatibility alias
 
-class DetectorHTTPHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        if self.path == "/" or self.path == "/index.html":
-            self.send_response(200)
-            self.send_header("Content-type", "text/html; charset=utf-8")
-            self.end_headers()
-            self.wfile.write(HTML_PAGE.encode("utf-8"))
-        else:
-            self.send_response(404)
-            self.end_headers()
+@app.route("/", methods=["GET"])
+@app.route("/index.html", methods=["GET"])
+def home():
+    return render_template_string(HTML_PAGE)
 
-    def do_POST(self):
-        if self.path == "/predict":
-            if predictor is None:
-                self._send_json({"error": "Model checkpoint not found. Please train model first."}, status=500)
-                return
+@app.route("/predict", methods=["POST"])
+def predict():
+    if predictor is None:
+        return jsonify({"error": "Model checkpoint not found. Please train model first."}), 500
 
-            content_length = int(self.headers.get("Content-Length", 0))
-            body = self.rfile.read(content_length)
+    if "image" not in request.files:
+        return jsonify({"error": "No image file uploaded in request."}), 400
 
-            # Extract image from multipart boundary or direct body
-            content_type = self.headers.get("Content-Type", "")
+    file = request.files["image"]
+    if file.filename == "":
+        return jsonify({"error": "Empty filename."}), 400
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
+        file.save(tmp.name)
+        tmp_path = tmp.name
+
+    try:
+        result = predictor.predict(tmp_path)
+
+        # Generate Grad-CAM Explainable AI Heatmap
+        if gradcam is not None:
             try:
-                if "multipart/form-data" in content_type:
-                    boundary = content_type.split("boundary=")[1].strip()
-                    parts = body.split(f"--{boundary}".encode())
-                    img_bytes = None
-                    for part in parts:
-                        if b"filename=" in part and b"\r\n\r\n" in part:
-                            header, img_data = part.split(b"\r\n\r\n", 1)
-                            # Strip trailing \r\n
-                            img_bytes = img_data.rstrip(b"\r\n--")
-                            break
-                    if not img_bytes:
-                        raise ValueError("No file content found in upload.")
-                else:
-                    img_bytes = body
+                pil_img = safe_image_loader(tmp_path)
+                tensor = predictor.transform(pil_img).unsqueeze(0).to(predictor.device)
+                heatmap = gradcam.generate_heatmap(tensor)
+                overlay = gradcam.overlay_heatmap(pil_img, heatmap, colormap_name="jet", alpha=0.55)
 
-                # Write temp image file for predictor
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
-                    tmp.write(img_bytes)
-                    tmp_path = tmp.name
+                buf = io.BytesIO()
+                overlay.save(buf, format="JPEG", quality=90)
+                result["gradcam_b64"] = "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode("utf-8")
+            except Exception as ge:
+                print(f"[WARNING] Grad-CAM generation error: {ge}")
 
-                try:
-                    result = predictor.predict(tmp_path)
-                    
-                    # Generate Grad-CAM Explainable AI Heatmap
-                    if gradcam is not None:
-                        try:
-                            pil_img = safe_image_loader(tmp_path)
-                            tensor = predictor.transform(pil_img).unsqueeze(0).to(predictor.device)
-                            heatmap = gradcam.generate_heatmap(tensor)
-                            overlay = gradcam.overlay_heatmap(pil_img, heatmap, colormap_name="jet", alpha=0.55)
-                            
-                            buf = io.BytesIO()
-                            overlay.save(buf, format="JPEG", quality=90)
-                            result["gradcam_b64"] = "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode("utf-8")
-                        except Exception as ge:
-                            print(f"[WARNING] Grad-CAM generation error: {ge}")
-
-                    self._send_json(result)
-                finally:
-                    if os.path.exists(tmp_path):
-                        os.remove(tmp_path)
-
-            except Exception as e:
-                self._send_json({"error": str(e)}, status=400)
-        else:
-            self.send_response(404)
-            self.end_headers()
-
-    def _send_json(self, data, status=200):
-        self.send_response(status)
-        self.send_header("Content-type", "application/json")
-        self.end_headers()
-        self.wfile.write(json.dumps(data).encode("utf-8"))
-
-    def log_message(self, format, *args):
-        # Clean logging
-        print(f"[HTTP] {self.address_string()} - {args[0]} {args[1]}")
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+    finally:
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
 
 
-def start_server():
-    server = HTTPServer((HOST, PORT), DetectorHTTPHandler)
+if __name__ == "__main__":
     url = f"http://{HOST}:{PORT}"
     print("\n" + "=" * 60)
     print(f" 🚀 AI-Generated Image Detector Web GUI is LIVE!")
     print(f" 👉 URL: {url}")
     print(f" Press Ctrl+C in this terminal to stop the server.")
     print("=" * 60 + "\n")
-    
-    # Auto-launch browser
+
     try:
         webbrowser.open(url)
     except Exception:
         pass
 
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print("\n[INFO] Server stopped.")
+    app.run(host=HOST, port=PORT, debug=False)
 
-
-if __name__ == "__main__":
-    start_server()
