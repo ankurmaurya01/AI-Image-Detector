@@ -81,8 +81,7 @@ def get_model():
                 self.device = get_device("auto")
                 self.model = build_model(cfg).to(self.device)
                 self.model.eval()
-                img_size = cfg.get("dataset", {}).get("image_size", 224)
-                self.transform = get_transforms(split="test", image_size=img_size)
+                self.transform = get_transforms(cfg, split="test")
 
             def predict(self, image_path):
                 pil_img = safe_image_loader(image_path)
@@ -498,6 +497,20 @@ HTML_PAGE = """<!DOCTYPE html>
           method: 'POST',
           body: formData
         });
+
+        if (!res.ok) {
+          const text = await res.text();
+          let msg = 'Server returned ' + res.status;
+          try {
+            const errObj = JSON.parse(text);
+            if (errObj.error) msg = errObj.error;
+          } catch(e) {
+            msg = text.substring(0, 150);
+          }
+          alert('Error: ' + msg);
+          return;
+        }
+
         const data = await res.json();
 
         if (data.error) {

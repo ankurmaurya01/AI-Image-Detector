@@ -84,7 +84,7 @@ class GradCAM:
         Returns:
             2D numpy array with values in [0, 1].
         """
-        self.model.zero_grad()
+        self.model.zero_grad(set_to_none=True)
         output = self.model(input_tensor)
 
         if target_class is None:
@@ -109,6 +109,11 @@ class GradCAM:
             heatmap /= max_val
         else:
             heatmap = np.zeros_like(heatmap)
+
+        # Free memory immediately
+        self.model.zero_grad(set_to_none=True)
+        self.gradients = None
+        self.activations = None
 
         return heatmap
 
