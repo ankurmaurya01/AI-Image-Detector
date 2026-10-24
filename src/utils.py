@@ -7,7 +7,6 @@ import os
 import random
 from typing import Any, Dict, List
 
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import yaml
@@ -95,6 +94,7 @@ def plot_confusion_matrix(
     output_path: str = "models/confusion_matrix.png",
     title: str = "Confusion Matrix",
 ) -> None:
+    import matplotlib.pyplot as plt
     """
     Render and save a confusion matrix heatmap.
 
@@ -154,6 +154,7 @@ def plot_training_curves(
     history: Dict[str, List[float]],
     output_path: str = "models/training_curves.png",
 ) -> None:
+    import matplotlib.pyplot as plt
     """
     Plot and save training/validation loss and accuracy curves across epochs.
 
