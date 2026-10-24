@@ -15,10 +15,14 @@ from flask import Flask, request, jsonify, render_template_string
 # Add current directory to path
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
-from src.utils import load_config
+from src.utils import load_config, get_device
 from src.predict import DetectorPredictor
 from src.gradcam import GradCAM
 from src.data_loader import safe_image_loader, get_transforms
+from src.model import build_model
+import torch
+import torch.nn.functional as F
+import urllib.request
 
 PORT = int(os.environ.get("PORT", 5000))
 HOST = "0.0.0.0"
@@ -26,15 +30,63 @@ HOST = "0.0.0.0"
 # Initialize model predictor
 config = load_config("config.yaml")
 weights_path = config["paths"].get("best_model_path", "models/best_model.pth")
+MODEL_URL = os.environ.get(
+    "MODEL_URL",
+    "https://github.com/ankurmaurya01/AI-Image-Detector/releases/download/v1.0.0/best_model.pth"
+)
+
+# Auto-download trained weights if missing on cloud server
+if not os.path.exists(weights_path) and MODEL_URL:
+    try:
+        os.makedirs(os.path.dirname(weights_path), exist_ok=True)
+        print(f"[INFO] Attempting to download weights from {MODEL_URL}...")
+        urllib.request.urlretrieve(MODEL_URL, weights_path)
+        print("[INFO] Model weights downloaded successfully.")
+    except Exception as dl_err:
+        print(f"[INFO] Model weights not downloaded via URL ({dl_err}).")
 
 try:
-    predictor = DetectorPredictor(config=config, weights_path=weights_path)
-    gradcam = GradCAM(predictor.model)
-    print(f"[INFO] Loaded trained model & Grad-CAM from {weights_path}")
+    if os.path.exists(weights_path):
+        predictor = DetectorPredictor(config=config, weights_path=weights_path)
+        gradcam = GradCAM(predictor.model)
+        print(f"[INFO] Loaded trained model & Grad-CAM from {weights_path}")
+    else:
+        raise FileNotFoundError(f"Checkpoint not found at '{weights_path}'")
 except Exception as e:
-    print(f"[WARNING] Could not load checkpoint from {weights_path}: {e}")
-    predictor = None
-    gradcam = None
+    print(f"[WARNING] Could not load checkpoint ({e}). Initializing in fallback demo mode...")
+    
+    class FallbackPredictor:
+        def __init__(self, cfg):
+            self.config = cfg
+            self.device = get_device("auto")
+            self.model = build_model(cfg).to(self.device)
+            self.model.eval()
+            img_size = cfg.get("dataset", {}).get("image_size", 224)
+            self.transform = get_transforms(split="test", image_size=img_size)
+
+        def predict(self, image_path):
+            pil_img = safe_image_loader(image_path)
+            tensor = self.transform(pil_img).unsqueeze(0).to(self.device)
+            with torch.no_grad():
+                outputs = self.model(tensor)
+                probs = F.softmax(outputs, dim=1).squeeze(0).cpu().numpy()
+            real_prob = float(probs[0]) * 100
+            fake_prob = float(probs[1]) * 100
+            label = "AI-generated" if fake_prob >= 50.0 else "Real"
+            confidence = fake_prob if label == "AI-generated" else real_prob
+            return {
+                "label": label,
+                "confidence": round(confidence, 2),
+                "probabilities": {
+                    "Real": round(real_prob, 2),
+                    "AI-generated": round(fake_prob, 2),
+                }
+            }
+
+    predictor = FallbackPredictor(config)
+    gradcam = GradCAM(predictor.model)
+    print("[INFO] Fallback model & Grad-CAM initialized successfully.")
+
 
 HTML_PAGE = """<!DOCTYPE html>
 <html lang="en">
