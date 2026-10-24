@@ -48,15 +48,25 @@ class DetectorPredictor:
                 "Please train the model first or provide a valid weights file via --weights."
             )
 
-        # Load checkpoint
+        # Load checkpoint with memory optimization
         checkpoint = torch.load(weights_path, map_location=self.device)
         saved_config = checkpoint.get("config", config)
+        if isinstance(saved_config, dict) and "model" in saved_config:
+            # Avoid downloading ImageNet weights since we load checkpoint weights directly
+            saved_config = dict(saved_config)
+            saved_config["model"] = dict(saved_config["model"])
+            saved_config["model"]["pretrained"] = False
         self.model = build_model(saved_config)
 
         if "model_state_dict" in checkpoint:
             self.model.load_state_dict(checkpoint["model_state_dict"])
         else:
             self.model.load_state_dict(checkpoint)
+
+        # Free checkpoint memory immediately
+        del checkpoint
+        import gc
+        gc.collect()
 
         self.model.to(self.device)
         self.model.eval()

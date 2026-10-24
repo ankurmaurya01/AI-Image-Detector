@@ -4,6 +4,7 @@ Flask web application compatible with local execution and cloud serverless platf
 """
 
 import base64
+import gc
 import io
 import json
 import os
@@ -11,6 +12,11 @@ import sys
 import tempfile
 import webbrowser
 from flask import Flask, request, jsonify, render_template_string
+
+# Restrict multithreading to stay under 512MB RAM on Render
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
 
 # Add current directory to path
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
@@ -24,10 +30,11 @@ import torch
 import torch.nn.functional as F
 import urllib.request
 
+torch.set_num_threads(1)
+
 PORT = int(os.environ.get("PORT", 5000))
 HOST = "0.0.0.0"
 
-# Initialize model predictor
 config = load_config("config.yaml")
 weights_path = config["paths"].get("best_model_path", "models/best_model.pth")
 MODEL_URL = os.environ.get(
@@ -35,57 +42,74 @@ MODEL_URL = os.environ.get(
     "https://github.com/ankurmaurya01/AI-Image-Detector/releases/download/v1.0.0/best_model.pth"
 )
 
-# Auto-download trained weights if missing on cloud server
-if not os.path.exists(weights_path) and MODEL_URL:
+# Global model references (loaded lazily to ensure immediate port binding)
+_predictor = None
+_gradcam = None
+
+def get_model():
+    global _predictor, _gradcam
+    if _predictor is not None:
+        return _predictor, _gradcam
+
+    torch.set_num_threads(1)
+
+    if not os.path.exists(weights_path) and MODEL_URL:
+        try:
+            os.makedirs(os.path.dirname(weights_path), exist_ok=True)
+            print(f"[INFO] Attempting to download weights from {MODEL_URL}...")
+            urllib.request.urlretrieve(MODEL_URL, weights_path)
+            if os.path.exists(weights_path) and os.path.getsize(weights_path) < 1000000:
+                os.remove(weights_path)
+            else:
+                print("[INFO] Model weights downloaded successfully.")
+        except Exception as dl_err:
+            print(f"[INFO] Model weights not downloaded via URL ({dl_err}).")
+
     try:
-        os.makedirs(os.path.dirname(weights_path), exist_ok=True)
-        print(f"[INFO] Attempting to download weights from {MODEL_URL}...")
-        urllib.request.urlretrieve(MODEL_URL, weights_path)
-        print("[INFO] Model weights downloaded successfully.")
-    except Exception as dl_err:
-        print(f"[INFO] Model weights not downloaded via URL ({dl_err}).")
+        if os.path.exists(weights_path):
+            _predictor = DetectorPredictor(config=config, weights_path=weights_path)
+            _gradcam = GradCAM(_predictor.model)
+            print(f"[INFO] Loaded trained model & Grad-CAM from {weights_path}")
+        else:
+            raise FileNotFoundError(f"Checkpoint not found at '{weights_path}'")
+    except Exception as e:
+        print(f"[WARNING] Could not load checkpoint ({e}). Initializing fallback demo mode...")
+        
+        class FallbackPredictor:
+            def __init__(self, cfg):
+                self.config = cfg
+                self.device = get_device("auto")
+                self.model = build_model(cfg).to(self.device)
+                self.model.eval()
+                img_size = cfg.get("dataset", {}).get("image_size", 224)
+                self.transform = get_transforms(split="test", image_size=img_size)
 
-try:
-    if os.path.exists(weights_path):
-        predictor = DetectorPredictor(config=config, weights_path=weights_path)
-        gradcam = GradCAM(predictor.model)
-        print(f"[INFO] Loaded trained model & Grad-CAM from {weights_path}")
-    else:
-        raise FileNotFoundError(f"Checkpoint not found at '{weights_path}'")
-except Exception as e:
-    print(f"[WARNING] Could not load checkpoint ({e}). Initializing in fallback demo mode...")
-    
-    class FallbackPredictor:
-        def __init__(self, cfg):
-            self.config = cfg
-            self.device = get_device("auto")
-            self.model = build_model(cfg).to(self.device)
-            self.model.eval()
-            img_size = cfg.get("dataset", {}).get("image_size", 224)
-            self.transform = get_transforms(split="test", image_size=img_size)
-
-        def predict(self, image_path):
-            pil_img = safe_image_loader(image_path)
-            tensor = self.transform(pil_img).unsqueeze(0).to(self.device)
-            with torch.no_grad():
-                outputs = self.model(tensor)
-                probs = F.softmax(outputs, dim=1).squeeze(0).cpu().numpy()
-            real_prob = float(probs[0]) * 100
-            fake_prob = float(probs[1]) * 100
-            label = "AI-generated" if fake_prob >= 50.0 else "Real"
-            confidence = fake_prob if label == "AI-generated" else real_prob
-            return {
-                "label": label,
-                "confidence": round(confidence, 2),
-                "probabilities": {
-                    "Real": round(real_prob, 2),
-                    "AI-generated": round(fake_prob, 2),
+            def predict(self, image_path):
+                pil_img = safe_image_loader(image_path)
+                tensor = self.transform(pil_img).unsqueeze(0).to(self.device)
+                with torch.no_grad():
+                    outputs = self.model(tensor)
+                    probs = F.softmax(outputs, dim=1).squeeze(0).cpu().numpy()
+                real_prob = float(probs[0]) * 100
+                fake_prob = float(probs[1]) * 100
+                label = "AI-generated" if fake_prob >= 50.0 else "Real"
+                confidence = fake_prob if label == "AI-generated" else real_prob
+                return {
+                    "label": label,
+                    "confidence": round(confidence, 2),
+                    "probabilities": {
+                        "Real": round(real_prob, 2),
+                        "AI-generated": round(fake_prob, 2),
+                    }
                 }
-            }
 
-    predictor = FallbackPredictor(config)
-    gradcam = GradCAM(predictor.model)
-    print("[INFO] Fallback model & Grad-CAM initialized successfully.")
+        _predictor = FallbackPredictor(config)
+        _gradcam = GradCAM(_predictor.model)
+        print("[INFO] Fallback model & Grad-CAM initialized successfully.")
+
+    gc.collect()
+    return _predictor, _gradcam
+
 
 
 HTML_PAGE = """<!DOCTYPE html>
@@ -527,8 +551,9 @@ def home():
 
 @app.route("/predict", methods=["POST"])
 def predict():
-    if predictor is None:
-        return jsonify({"error": "Model checkpoint not found. Please train model first."}), 500
+    pred, cam = get_model()
+    if pred is None:
+        return jsonify({"error": "Model initialization failed."}), 500
 
     if "image" not in request.files:
         return jsonify({"error": "No image file uploaded in request."}), 400
@@ -542,15 +567,15 @@ def predict():
         tmp_path = tmp.name
 
     try:
-        result = predictor.predict(tmp_path)
+        result = pred.predict(tmp_path)
 
         # Generate Grad-CAM Explainable AI Heatmap
-        if gradcam is not None:
+        if cam is not None:
             try:
                 pil_img = safe_image_loader(tmp_path)
-                tensor = predictor.transform(pil_img).unsqueeze(0).to(predictor.device)
-                heatmap = gradcam.generate_heatmap(tensor)
-                overlay = gradcam.overlay_heatmap(pil_img, heatmap, colormap_name="jet", alpha=0.55)
+                tensor = pred.transform(pil_img).unsqueeze(0).to(pred.device)
+                heatmap = cam.generate_heatmap(tensor)
+                overlay = cam.overlay_heatmap(pil_img, heatmap, colormap_name="jet", alpha=0.55)
 
                 buf = io.BytesIO()
                 overlay.save(buf, format="JPEG", quality=90)

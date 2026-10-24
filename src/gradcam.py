@@ -9,7 +9,6 @@ import os
 import sys
 from typing import Optional, Tuple
 
-import matplotlib.cm as cm
 import numpy as np
 from PIL import Image
 import torch
@@ -137,14 +136,11 @@ class GradCAM:
         heatmap_img = Image.fromarray(np.uint8(255 * heatmap)).resize((w, h), Image.BILINEAR)
         heatmap_resized = np.array(heatmap_img) / 255.0
 
-        # Apply colormap (compatible with modern and older matplotlib)
-        try:
-            import matplotlib.pyplot as plt
-            cmap = plt.get_cmap(colormap_name)
-        except Exception:
-            cmap = cm.get_cmap(colormap_name)
-        colored_heatmap = cmap(heatmap_resized)[:, :, :3]  # Discard alpha
-        colored_heatmap = np.uint8(255 * colored_heatmap)
+        # Apply pure numpy JET colormap (avoids loading matplotlib font cache into memory)
+        r = np.clip(1.5 - np.abs(4.0 * heatmap_resized - 3.0), 0.0, 1.0)
+        g = np.clip(1.5 - np.abs(4.0 * heatmap_resized - 2.0), 0.0, 1.0)
+        b = np.clip(1.5 - np.abs(4.0 * heatmap_resized - 1.0), 0.0, 1.0)
+        colored_heatmap = np.uint8(255 * np.dstack([r, g, b]))
 
         # Blend with original image
         orig_np = np.array(pil_img.convert("RGB"))
