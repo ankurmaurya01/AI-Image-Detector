@@ -23,12 +23,10 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 from src.utils import load_config, get_device
 from src.predict import DetectorPredictor
-from src.gradcam import GradCAM
 from src.data_loader import safe_image_loader, get_transforms
 from src.model import build_model
 import torch
 import torch.nn.functional as F
-import urllib.request
 
 torch.set_num_threads(1)
 
@@ -36,62 +34,45 @@ PORT = int(os.environ.get("PORT", 5000))
 HOST = "0.0.0.0"
 
 config = load_config("config.yaml")
-weights_path = config["paths"].get("best_model_path", "models/best_model.pth")
-if not os.path.exists(weights_path) and os.path.exists("models/inference_model.pth"):
-    weights_path = "models/inference_model.pth"
+weights_path = "models/inference_model.pth" if os.path.exists("models/inference_model.pth") else config["paths"].get("best_model_path", "models/best_model.pth")
 
-MODEL_URL = os.environ.get(
-    "MODEL_URL",
-    "https://github.com/ankurmaurya01/AI-Image-Detector/releases/download/v1.0.0/best_model.pth"
-)
-
-# Global model references (loaded lazily to ensure immediate port binding)
+# Global predictor reference
 _predictor = None
-_gradcam = None
 
 def get_model():
-    global _predictor, _gradcam
+    global _predictor
     if _predictor is not None:
-        return _predictor, _gradcam
+        return _predictor
 
     torch.set_num_threads(1)
-
-    if not os.path.exists(weights_path) and MODEL_URL:
-        try:
-            os.makedirs(os.path.dirname(weights_path), exist_ok=True)
-            print(f"[INFO] Attempting to download weights from {MODEL_URL}...")
-            urllib.request.urlretrieve(MODEL_URL, weights_path)
-            if os.path.exists(weights_path) and os.path.getsize(weights_path) < 1000000:
-                os.remove(weights_path)
-            else:
-                print("[INFO] Model weights downloaded successfully.")
-        except Exception as dl_err:
-            print(f"[INFO] Model weights not downloaded via URL ({dl_err}).")
 
     try:
         if os.path.exists(weights_path):
             _predictor = DetectorPredictor(config=config, weights_path=weights_path)
-            _gradcam = GradCAM(_predictor.model)
-            print(f"[INFO] Loaded trained model & Grad-CAM from {weights_path}")
+            print(f"[INFO] Loaded trained model from {weights_path}")
         else:
             raise FileNotFoundError(f"Checkpoint not found at '{weights_path}'")
     except Exception as e:
-        print(f"[WARNING] Could not load checkpoint ({e}). Initializing fallback demo mode...")
+        print(f"[WARNING] Could not load checkpoint ({e}). Initializing fallback mode...")
         
         class FallbackPredictor:
             def __init__(self, cfg):
                 self.config = cfg
                 self.device = get_device("auto")
-                self.model = build_model(cfg).to(self.device)
+                cfg_copy = dict(cfg)
+                if "model" in cfg_copy:
+                    cfg_copy["model"] = dict(cfg_copy["model"])
+                    cfg_copy["model"]["pretrained"] = False
+                self.model = build_model(cfg_copy).to(self.device)
                 self.model.eval()
                 self.transform = get_transforms(cfg, split="test")
 
             def predict(self, image_path):
                 pil_img = safe_image_loader(image_path)
                 tensor = self.transform(pil_img).unsqueeze(0).to(self.device)
-                with torch.no_grad():
+                with torch.inference_mode():
                     outputs = self.model(tensor)
-                    probs = F.softmax(outputs, dim=1).squeeze(0).cpu().numpy()
+                    probs = F.softmax(outputs.float(), dim=1).squeeze(0).cpu().numpy()
                 real_prob = float(probs[0]) * 100
                 fake_prob = float(probs[1]) * 100
                 label = "AI-generated" if fake_prob >= 50.0 else "Real"
@@ -106,11 +87,10 @@ def get_model():
                 }
 
         _predictor = FallbackPredictor(config)
-        _gradcam = GradCAM(_predictor.model)
-        print("[INFO] Fallback model & Grad-CAM initialized successfully.")
+        print("[INFO] Fallback model initialized successfully.")
 
     gc.collect()
-    return _predictor, _gradcam
+    return _predictor
 
 
 
@@ -567,7 +547,7 @@ def home():
 
 @app.route("/predict", methods=["POST"])
 def predict():
-    pred, cam = get_model()
+    pred = get_model()
     if pred is None:
         return jsonify({"error": "Model initialization failed."}), 500
 
@@ -585,23 +565,6 @@ def predict():
 
     try:
         result = pred.predict(tmp_path)
-
-        # Grad-CAM requires backprop which exceeds Render's 512MB RAM limit.
-        # It can be enabled on servers with >= 1GB RAM by setting ENABLE_GRADCAM=1
-        enable_gradcam = os.environ.get("ENABLE_GRADCAM", "0").lower() in ("1", "true", "yes")
-        if cam is not None and enable_gradcam:
-            try:
-                pil_img = safe_image_loader(tmp_path)
-                tensor = pred.transform(pil_img).unsqueeze(0).to(pred.device)
-                heatmap = cam.generate_heatmap(tensor)
-                overlay = cam.overlay_heatmap(pil_img, heatmap, colormap_name="jet", alpha=0.55)
-
-                buf = io.BytesIO()
-                overlay.save(buf, format="JPEG", quality=90)
-                result["gradcam_b64"] = "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode("utf-8")
-            except Exception as ge:
-                print(f"[WARNING] Grad-CAM generation error: {ge}")
-
         gc.collect()
         return jsonify(result)
     except Exception as e:
