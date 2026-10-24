@@ -578,9 +578,10 @@ def predict():
     if file.filename == "":
         return jsonify({"error": "Empty filename."}), 400
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
-        file.save(tmp.name)
-        tmp_path = tmp.name
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
+    tmp_path = tmp.name
+    tmp.close()
+    file.save(tmp_path)
 
     try:
         result = pred.predict(tmp_path)
@@ -601,7 +602,9 @@ def predict():
 
         return jsonify(result)
     except Exception as e:
-        return jsonify({"error": str(e)}), 400
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e) or repr(e)}), 400
     finally:
         if os.path.exists(tmp_path):
             try:
