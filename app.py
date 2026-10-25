@@ -340,13 +340,10 @@ def admin_login():
     remaining_minutes = int(remaining_secs / 60) + 1 if is_locked else 0
 
     if request.method == "POST":
-        if is_locked:
-            flash(f"Access blocked due to excessive failed attempts. Please wait {remaining_minutes} minute(s).", "danger")
-            return render_template("admin/login.html", is_locked=True, remaining_minutes=remaining_minutes)
-
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
 
+        # Check credentials first so the real owner with valid credentials is never locked out
         if verify_admin_credentials(username, password):
             record_login_attempt(client_ip, username, success=True)
             login_user(AdminUser(username), remember=False)
@@ -355,6 +352,10 @@ def admin_login():
             if next_page and next_page.startswith("/admin"):
                 return redirect(next_page)
             return redirect(url_for("admin_dashboard"))
+
+        if is_locked:
+            flash(f"Access blocked due to excessive failed attempts. Please wait {remaining_minutes} minute(s).", "danger")
+            return render_template("admin/login.html", is_locked=True, remaining_minutes=remaining_minutes)
         else:
             record_login_attempt(client_ip, username, success=False)
             failed_count = get_failed_attempts_count(client_ip, lockout_minutes=15)
