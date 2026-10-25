@@ -240,13 +240,77 @@ print(result["confidence"])  # e.g. 98.5
 
 Two graphical interface options are included out of the box with zero extra dependencies:
 
-#### 🌐 Option A: Modern Web GUI (Browser App)
-Launch a local interactive web interface featuring drag-and-drop upload, image preview, animated confidence meters, and class probability bars:
+#### 🌐 Option A: Modern Web GUI & Admin Dashboard
+Launch the web interface featuring drag-and-drop upload, image preview, animated confidence meters, class probability bars, and a secure owner-only admin portal:
 
 ```bash
 python app.py
 ```
-This automatically opens your default browser at `http://127.0.0.1:5000`.
+- **Public Detector**: `http://127.0.0.1:5000/` (completely clean UI, no admin links visible)
+- **Admin Portal**: `http://127.0.0.1:5000/admin` (password-protected, single-admin access)
+
+---
+
+## 🔐 Admin Portal & Security System
+
+The project includes an **admin-only management portal** at `/admin` designed for the project owner to monitor user submissions, inspect predictions, manage dataset expansion, and analyze traffic metrics.
+
+### 1. Key Features
+- **Automatic Submission Logging**: Every user upload is stored under `uploads/` with a cryptographically randomized UUID filename (preventing filename collision and path manipulation). Metadata (UTC timestamp, prediction label, confidence score, class probabilities, client IP address, session ID, original filename, and file size) is recorded in SQLite (`admin_data.db`) via SQLAlchemy.
+- **Admin Analytics Dashboard (`/admin`)**:
+  - Live summary statistics: Total Submissions, Real vs AI % distribution, and Average Model Confidence.
+  - Interactive Daily Submissions activity chart (Chart.js).
+  - Search by filename or IP address.
+  - Multi-criteria filtering by verdict (Real vs AI) and date range.
+  - Sorting by newest, oldest, confidence, and file size.
+  - Low-memory responsive pagination and lazy-loaded thumbnails.
+- **Training Dataset Ingestion ("Move to Dataset")**: One-click action to transfer submitted images directly into `database/train/REAL` or `database/train/FAKE` for ongoing model fine-tuning and active learning.
+- **Data Export & Deletion**: Export all submission logs as a formatted `.csv` file (`/admin/export-csv`) or permanently purge records along with their stored image files.
+- **Multi-User Concurrency**: Built-in threading synchronization locks inference passes so up to 10+ simultaneous users can analyze images concurrently without exceeding Render's 512 MB memory limit.
+
+---
+
+### 2. Setting Up Admin Credentials (`.env`)
+
+Admin credentials and secrets are **never hardcoded** and are kept out of version control via `.gitignore`.
+
+#### Step 1: Run the Interactive Password Generator
+Run the built-in CLI tool to generate a cryptographically salted password hash (`scrypt` / `pbkdf2`) and a secure session key:
+
+```bash
+python generate_admin_hash.py
+```
+This utility prompts for your desired admin username and password, generates a 64-character random `SECRET_KEY`, and creates or updates your local `.env` file automatically:
+
+```ini
+SECRET_KEY=94b7e8d2...
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD_HASH=scrypt:32768:8:1$7f3b...
+MAX_CONTENT_LENGTH=10485760
+```
+
+#### Step 2: Accessing the Dashboard
+1. Start the server:
+   ```bash
+   python app.py
+   # Or with production Gunicorn:
+   gunicorn app:app --workers 1 --threads 8 --timeout 120
+   ```
+2. Navigate to `http://127.0.0.1:5000/admin`.
+3. You will be redirected to `/admin/login`. Enter your admin username and password to log in.
+
+---
+
+### 3. Security Hardening Measures
+- **No Public Registration**: Single-operator admin access only. There is no sign-up or registration route.
+- **Hidden Admin Footprint**: The public detector (`/`) has zero links or references to `/admin` or `/admin/login`.
+- **Brute-Force Protection & Lockout**: Tracks consecutive failed login attempts per client IP. After **5 failed attempts**, the IP is locked out for **15 minutes**.
+- **CSRF Defense**: All form submissions (login, logout, dataset movement, record deletion) are protected against Cross-Site Request Forgery via `Flask-WTF` CSRF tokens.
+- **Private Image Storage**: The `uploads/` directory is isolated from public static file serving. Stored images and thumbnails can only be retrieved by authenticated admin sessions (`/admin/image/<uuid>` and `/admin/thumbnail/<uuid>`).
+- **File Validation**: Enforces strict MIME and extension validation (JPEG, PNG, WebP), 10 MB payload limits, and Pillow image verification before saving.
+- **Privacy Notice**: The public detector displays an explicit privacy notice informing users that submitted images are stored for security and quality evaluation purposes.
+
+---
 
 #### 🖥️ Option B: Native Desktop GUI (Tkinter Window)
 Launch an OS desktop window with a native file picker, preview display, and instant detection badges:

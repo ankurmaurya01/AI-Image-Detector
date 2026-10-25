@@ -50,6 +50,10 @@ models/*.pth
 *.sqlite
 *.sqlite3
 
+# Uploaded user submissions
+uploads/*
+!uploads/.gitkeep
+
 # Logs
 *.log
 logs/

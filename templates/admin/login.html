@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Sign In - AI Image Detector</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card: #131b2e;
+      --border: #1e293b;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --danger: #ef4444;
+      --danger-bg: rgba(239, 68, 68, 0.12);
+      --danger-border: rgba(239, 68, 68, 0.3);
+      --success: #10b981;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
+    body {
+      background: radial-gradient(circle at 50% 10%, #1e1b4b 0%, var(--bg) 80%);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .login-container {
+      width: 100%;
+      max-width: 440px;
+    }
+    .login-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 40px 32px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    .shield-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 56px;
+      height: 56px;
+      border-radius: 16px;
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      font-size: 26px;
+      margin-bottom: 16px;
+    }
+    h1 {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 6px;
+      color: #fff;
+    }
+    p.subtitle {
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #cbd5e1;
+      margin-bottom: 8px;
+    }
+    input[type="text"], input[type="password"] {
+      width: 100%;
+      padding: 12px 16px;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid #334155;
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 14px;
+      transition: all 0.2s ease;
+      outline: none;
+    }
+    input[type="text"]:focus, input[type="password"]:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+      background: rgba(15, 23, 42, 0.9);
+    }
+    .btn-submit {
+      width: 100%;
+      padding: 13px;
+      border-radius: 10px;
+      background: var(--primary);
+      color: white;
+      font-size: 14px;
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 8px;
+      box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
+    }
+    .btn-submit:hover:not(:disabled) {
+      background: var(--primary-hover);
+      transform: translateY(-1px);
+    }
+    .btn-submit:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .alert {
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 13px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      line-height: 1.4;
+    }
+    .alert-danger {
+      background: var(--danger-bg);
+      border: 1px solid var(--danger-border);
+      color: #fca5a5;
+    }
+    .alert-warning {
+      background: rgba(245, 158, 11, 0.12);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      color: #fcd34d;
+    }
+    .alert-success {
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: #6ee7b7;
+    }
+    .footer-note {
+      text-align: center;
+      margin-top: 24px;
+      font-size: 12px;
+      color: #64748b;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-card">
+      <div class="header">
+        <div class="shield-badge">🛡️</div>
+        <h1>Admin Console</h1>
+        <p class="subtitle">Authorized Operator Access Only</p>
+      </div>
+
+      <!-- Flash Messages -->
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="alert alert-{{ 'danger' if category in ['error', 'danger'] else category }}">
+              <span>{{ '⚠️' if category in ['warning', 'error', 'danger'] else 'ℹ️' }}</span>
+              <div>{{ message }}</div>
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <!-- Lockout Alert -->
+      {% if is_locked %}
+        <div class="alert alert-danger">
+          <span>🚫</span>
+          <div>
+            <strong>Access Temporarily Blocked:</strong><br>
+            Too many consecutive failed login attempts from this network. Try again in <strong>{{ remaining_minutes }} minute(s)</strong>.
+          </div>
+        </div>
+      {% endif %}
+
+      <form method="POST" action="{{ url_for('admin_login') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+        <div class="form-group">
+          <label for="username">Admin Username</label>
+          <input type="text" id="username" name="username" required autocomplete="username" placeholder="Enter administrator username" {% if is_locked %}disabled{% endif %} autofocus>
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" required autocomplete="current-password" placeholder="••••••••••••" {% if is_locked %}disabled{% endif %}>
+        </div>
+
+        <button type="submit" class="btn-submit" {% if is_locked %}disabled{% endif %}>
+          {% if is_locked %}Locked Out{% else %}Sign In to Console{% endif %}
+        </button>
+      </form>
+    </div>
+
+    <div class="footer-note">
+      Strict single-operator policy &bull; 5-attempt rate-limiting active
+    </div>
+  </div>
+</body>
+</html>

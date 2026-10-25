@@ -6,3 +6,7 @@ pyyaml>=6.0
 numpy>=1.24.0
 flask>=2.3.0
 gunicorn>=21.2.0
+Flask-Login>=0.6.3
+Flask-SQLAlchemy>=3.1.1
+Flask-WTF>=1.2.1
+python-dotenv>=1.0.0

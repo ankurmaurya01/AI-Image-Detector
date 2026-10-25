@@ -1,9 +1,14 @@
 """
-AI-Generated Image Detector - Web GUI Application
-Flask web application compatible with local execution and cloud serverless platforms (Vercel).
+AI-Generated Image Detector - Web Application & Secure Admin Console
+Flask web application featuring:
+1. Public Real vs. AI-Generated image detection with high-concurrency serialized inference.
+2. Full logging of submissions (randomized UUID storage, SQLite audit log, client metadata).
+3. Secure, single-operator admin dashboard (/admin) with filtering, statistics, CSV export,
+   thumbnail viewer, training dataset ingestion, CSRF protection, and brute-force lockout.
 """
 
-import base64
+from datetime import datetime, timedelta
+import csv
 import gc
 import io
 import json
@@ -11,10 +16,22 @@ import os
 import sys
 import tempfile
 import threading
+import uuid
 import webbrowser
-from flask import Flask, request, jsonify, render_template_string
 
-# Restrict multithreading to stay under 512MB RAM on Render
+from dotenv import load_dotenv
+load_dotenv()
+
+from flask import (
+    Flask, request, jsonify, render_template, redirect, url_for,
+    flash, send_from_directory, Response, abort
+)
+from flask_login import login_user, logout_user, login_required, current_user
+from flask_wtf.csrf import CSRFProtect
+from werkzeug.utils import secure_filename
+from PIL import Image
+
+# Restrict multithreading to stay under 512MB RAM on Render / shared hosts
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
@@ -26,10 +43,33 @@ from src.utils import load_config, get_device
 from src.predict import DetectorPredictor
 from src.data_loader import safe_image_loader, get_transforms
 from src.model import build_model
+from src.database import (
+    db, init_db, PredictionLog, UPLOADS_DIR, THUMBNAILS_DIR,
+    record_prediction, is_ip_locked_out, record_login_attempt,
+    get_summary_statistics, move_image_to_dataset, get_failed_attempts_count
+)
+from src.auth import init_auth, AdminUser, verify_admin_credentials
 import torch
 import torch.nn.functional as F
 
 torch.set_num_threads(1)
+
+# Application Configuration
+app = Flask(__name__)
+application = app  # WSGI compatibility alias
+
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-insecure-secret-key-change-in-env")
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + os.path.abspath("admin_data.db")
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["MAX_CONTENT_LENGTH"] = int(os.environ.get("MAX_CONTENT_LENGTH", 10 * 1024 * 1024))  # 10 MB limit
+
+# Allowed upload extensions
+ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+
+# Initialize CSRF Protection and Database/Auth extensions
+csrf = CSRFProtect(app)
+init_db(app)
+init_auth(app)
 
 PORT = int(os.environ.get("PORT", 5000))
 HOST = "0.0.0.0"
@@ -41,7 +81,9 @@ weights_path = "models/inference_model.pth" if os.path.exists("models/inference_
 _predictor = None
 _predict_lock = threading.Lock()
 
+
 def get_model():
+    """Lazy-load the model to enable instant server port binding on cloud hosts."""
     global _predictor
     if _predictor is not None:
         return _predictor
@@ -56,7 +98,7 @@ def get_model():
             raise FileNotFoundError(f"Checkpoint not found at '{weights_path}'")
     except Exception as e:
         print(f"[WARNING] Could not load checkpoint ({e}). Initializing fallback mode...")
-        
+
         class FallbackPredictor:
             def __init__(self, cfg):
                 self.config = cfg
@@ -95,482 +137,117 @@ def get_model():
     return _predictor
 
 
+def get_client_ip() -> str:
+    """Extract real client IP behind reverse proxies (Render, Cloudflare, etc.)."""
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    return request.remote_addr or "127.0.0.1"
 
-HTML_PAGE = """<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Image Detector</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg: #0b0f19;
-      --card: #131b2e;
-      --border: #1e293b;
-      --text: #f8fafc;
-      --muted: #94a3b8;
-      --primary: #6366f1;
-      --primary-hover: #4f46e5;
-      --real: #10b981;
-      --fake: #f43f5e;
-      --ring: rgba(99, 102, 241, 0.25);
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
-    body {
-      background: radial-gradient(circle at 50% 0%, #172554 0%, var(--bg) 75%);
-      color: var(--text);
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 40px 20px;
-    }
-    .container {
-      width: 100%;
-      max-width: 860px;
-      display: flex;
-      flex-direction: column;
-      gap: 24px;
-    }
-    header {
-      text-align: center;
-      margin-bottom: 8px;
-    }
-    .badge {
-      display: inline-block;
-      padding: 6px 14px;
-      border-radius: 9999px;
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      background: rgba(99, 102, 241, 0.15);
-      color: #818cf8;
-      border: 1px solid rgba(99, 102, 241, 0.3);
-      margin-bottom: 12px;
-    }
-    h1 {
-      font-size: 32px;
-      font-weight: 800;
-      letter-spacing: -0.02em;
-      background: linear-gradient(135deg, #fff 0%, #cbd5e1 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      margin-bottom: 8px;
-    }
-    p.subtitle {
-      color: var(--muted);
-      font-size: 15px;
-    }
-    .main-card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 32px;
-      box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
-    }
-    .dropzone {
-      border: 2px dashed #334155;
-      border-radius: 16px;
-      padding: 40px 20px;
-      text-align: center;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      background: rgba(15, 23, 42, 0.4);
-      position: relative;
-    }
-    .dropzone:hover, .dropzone.dragover {
-      border-color: var(--primary);
-      background: rgba(99, 102, 241, 0.08);
-      transform: translateY(-2px);
-    }
-    .dropzone-icon {
-      font-size: 42px;
-      margin-bottom: 12px;
-    }
-    .dropzone-text {
-      font-size: 16px;
-      font-weight: 600;
-      color: var(--text);
-      margin-bottom: 6px;
-    }
-    .dropzone-sub {
-      font-size: 13px;
-      color: var(--muted);
-    }
-    input[type="file"] {
-      display: none;
-    }
-    .preview-section {
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      margin-top: 24px;
-      gap: 20px;
-    }
-    .preview-wrapper {
-      position: relative;
-      max-width: 360px;
-      max-height: 360px;
-      border-radius: 14px;
-      overflow: hidden;
-      border: 1px solid #334155;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
-    }
-    .preview-wrapper img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-    }
-    .btn-group {
-      display: flex;
-      gap: 12px;
-    }
-    button {
-      padding: 12px 24px;
-      border-radius: 12px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-      border: none;
-    }
-    .btn-primary {
-      background: var(--primary);
-      color: white;
-      box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
-    }
-    .btn-primary:hover {
-      background: var(--primary-hover);
-      transform: translateY(-1px);
-    }
-    .btn-secondary {
-      background: #1e293b;
-      color: var(--muted);
-    }
-    .btn-secondary:hover {
-      background: #334155;
-      color: white;
-    }
-    .loading-spinner {
-      display: none;
-      align-items: center;
-      gap: 10px;
-      color: #cbd5e1;
-      font-size: 14px;
-      margin-top: 16px;
-    }
-    .spinner {
-      width: 20px;
-      height: 20px;
-      border: 3px solid rgba(255,255,255,0.2);
-      border-top-color: var(--primary);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .result-card {
-      display: none;
-      margin-top: 28px;
-      border-radius: 16px;
-      padding: 24px;
-      border: 1px solid #1e293b;
-      background: rgba(15, 23, 42, 0.7);
-      animation: fadeIn 0.3s ease;
-    }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-    .result-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 20px;
-    }
-    .verdict-tag {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 18px;
-      border-radius: 10px;
-      font-size: 18px;
-      font-weight: 800;
-      letter-spacing: -0.01em;
-    }
-    .verdict-real {
-      background: rgba(16, 185, 129, 0.15);
-      color: #34d399;
-      border: 1px solid rgba(16, 185, 129, 0.3);
-    }
-    .verdict-fake {
-      background: rgba(244, 63, 94, 0.15);
-      color: #fb7185;
-      border: 1px solid rgba(244, 63, 94, 0.3);
-    }
-    .confidence-value {
-      font-size: 28px;
-      font-weight: 800;
-      color: var(--text);
-    }
-    .bar-group {
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-    }
-    .bar-item {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    .bar-label {
-      display: flex;
-      justify-content: space-between;
-      font-size: 13px;
-      font-weight: 600;
-    }
-    .bar-track {
-      height: 10px;
-      background: #1e293b;
-      border-radius: 9999px;
-      overflow: hidden;
-    }
-    .bar-fill {
-      height: 100%;
-      border-radius: 9999px;
-      transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .fill-real { background: linear-gradient(90deg, #059669, #10b981); }
-    .fill-fake { background: linear-gradient(90deg, #e11d48, #f43f5e); }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <header>
-      <div class="badge">PyTorch Deep Learning</div>
-      <h1>AI-Generated Image Detector</h1>
-      <p class="subtitle">Upload any image to verify if it is authentic or synthetically generated by AI</p>
-    </header>
 
-    <div class="main-card">
-      <div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()">
-        <div class="dropzone-icon">🖼️</div>
-        <div class="dropzone-text">Click to choose or drag & drop an image</div>
-        <div class="dropzone-sub">Supports JPG, PNG, WEBP, BMP</div>
-        <input type="file" id="fileInput" accept="image/*" onchange="handleFile(this.files[0])">
-      </div>
-
-      <div class="preview-section" id="previewSection">
-        <div class="preview-wrapper">
-          <img id="previewImg" src="" alt="Preview">
-        </div>
-        <div class="btn-group">
-          <button class="btn-primary" id="analyzeBtn" onclick="analyzeImage()">Analyze Image</button>
-          <button class="btn-secondary" onclick="resetUpload()">Upload Another</button>
-        </div>
-        <div class="loading-spinner" id="spinner">
-          <div class="spinner"></div>
-          <span>Processing with ResNet50 neural network...</span>
-        </div>
-      </div>
-
-      <div class="result-card" id="resultCard">
-        <div class="result-header">
-          <div>
-            <div style="font-size: 12px; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; font-weight: 700;">Detection Verdict</div>
-            <div class="verdict-tag" id="verdictBadge">AI-Generated</div>
-          </div>
-          <div style="text-align: right;">
-            <div style="font-size: 12px; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; font-weight: 700;">Confidence</div>
-            <div class="confidence-value" id="confidenceVal">98.5%</div>
-          </div>
-        </div>
-
-        <div class="bar-group">
-          <div class="bar-item">
-            <div class="bar-label">
-              <span>Authentic (Real Photo)</span>
-              <span id="realProb">1.5%</span>
-            </div>
-            <div class="bar-track">
-              <div class="bar-fill fill-real" id="realBar" style="width: 1.5%;"></div>
-            </div>
-          </div>
-          <div class="bar-item">
-            <div class="bar-label">
-              <span>AI-Generated (Synthetic)</span>
-              <span id="fakeProb">98.5%</span>
-            </div>
-            <div class="bar-track">
-              <div class="bar-fill fill-fake" id="fakeBar" style="width: 98.5%;"></div>
-            </div>
-          </div>
-        </div>
-
-        <div id="gradcamContainer" style="display: none; margin-top: 24px; padding-top: 20px; border-top: 1px solid #1e293b;">
-          <div style="font-size: 13px; font-weight: 700; color: #cbd5e1; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-            <span>🔬 Explainable AI (Grad-CAM Heatmap)</span>
-          </div>
-          <p style="font-size: 12px; color: var(--muted); margin-bottom: 14px; line-height: 1.5;">
-            Visualizes where the neural network focused. As detailed in the CIFAKE research paper, authentic images trigger holistic features, whereas AI-generated images trigger localized background defects and texture artifacts.
-          </p>
-          <div style="display: flex; justify-content: center;">
-            <div style="max-width: 320px; border-radius: 12px; overflow: hidden; border: 1px solid #334155; box-shadow: 0 8px 20px rgba(0,0,0,0.3);">
-              <img id="gradcamImg" src="" alt="Grad-CAM Heatmap" style="width: 100%; display: block;">
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    let selectedFile = null;
-    const dropzone = document.getElementById('dropzone');
-
-    ['dragenter', 'dragover'].forEach(name => {
-      dropzone.addEventListener(name, (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
-    });
-    ['dragleave', 'drop'].forEach(name => {
-      dropzone.addEventListener(name, (e) => { e.preventDefault(); dropzone.classList.remove('dragover'); });
-    });
-    dropzone.addEventListener('drop', (e) => {
-      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-        handleFile(e.dataTransfer.files[0]);
-      }
-    });
-
-    function handleFile(file) {
-      if (!file || !file.type.startsWith('image/')) {
-        alert('Please upload a valid image file.');
-        return;
-      }
-      selectedFile = file;
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        document.getElementById('previewImg').src = e.target.result;
-        dropzone.style.display = 'none';
-        document.getElementById('previewSection').style.display = 'flex';
-        document.getElementById('resultCard').style.display = 'none';
-      };
-      reader.readAsDataURL(file);
-    }
-
-    function resetUpload() {
-      selectedFile = null;
-      document.getElementById('fileInput').value = '';
-      dropzone.style.display = 'block';
-      document.getElementById('previewSection').style.display = 'none';
-      document.getElementById('resultCard').style.display = 'none';
-    }
-
-    async function analyzeImage() {
-      if (!selectedFile) return;
-
-      const btn = document.getElementById('analyzeBtn');
-      const spinner = document.getElementById('spinner');
-      btn.disabled = true;
-      spinner.style.display = 'flex';
-      document.getElementById('resultCard').style.display = 'none';
-
-      try {
-        const formData = new FormData();
-        formData.append('image', selectedFile);
-
-        const res = await fetch('/predict', {
-          method: 'POST',
-          body: formData
-        });
-
-        if (!res.ok) {
-          const text = await res.text();
-          let msg = 'Server returned ' + res.status;
-          try {
-            const errObj = JSON.parse(text);
-            if (errObj.error) msg = errObj.error;
-          } catch(e) {
-            msg = text.substring(0, 150);
-          }
-          alert('Error: ' + msg);
-          return;
-        }
-
-        const data = await res.json();
-
-        if (data.error) {
-          alert('Error: ' + data.error);
-          return;
-        }
-
-        const isReal = data.label === 'Real';
-        const badge = document.getElementById('verdictBadge');
-        badge.textContent = isReal ? 'Authentic Real' : 'AI-Generated';
-        badge.className = 'verdict-tag ' + (isReal ? 'verdict-real' : 'verdict-fake');
-
-        document.getElementById('confidenceVal').textContent = data.confidence.toFixed(1) + '%';
-        
-        const realPct = data.probabilities['Real'] || 0;
-        const fakePct = data.probabilities['AI-generated'] || 0;
-
-        document.getElementById('realProb').textContent = realPct.toFixed(1) + '%';
-        document.getElementById('realBar').style.width = realPct + '%';
-
-        document.getElementById('fakeProb').textContent = fakePct.toFixed(1) + '%';
-        document.getElementById('fakeBar').style.width = fakePct + '%';
-
-        if (data.gradcam_b64) {
-          document.getElementById('gradcamImg').src = data.gradcam_b64;
-          document.getElementById('gradcamContainer').style.display = 'block';
-        } else {
-          document.getElementById('gradcamContainer').style.display = 'none';
-        }
-
-        document.getElementById('resultCard').style.display = 'block';
-      } catch (err) {
-        alert('Analysis failed: ' + err.message);
-      } finally {
-        btn.disabled = false;
-        spinner.style.display = 'none';
-      }
-    }
-  </script>
-</body>
-</html>
-"""
-
-app = Flask(__name__)
-application = app  # WSGI compatibility alias
+# ==============================================================================
+# PUBLIC ROUTES
+# ==============================================================================
 
 @app.route("/", methods=["GET"])
-@app.route("/index.html", methods=["GET"])
 def home():
-    return render_template_string(HTML_PAGE)
+    """Public Image Detector interface (contains no link to /admin)."""
+    return render_template("index.html")
+
+
+@app.route("/index.html", methods=["GET"])
+def index_html():
+    return redirect(url_for("home"))
+
 
 @app.route("/predict", methods=["POST"])
+@csrf.exempt  # Exempt public image submission API from CSRF
 def predict():
+    """
+    Public Prediction Endpoint:
+    1. Validates file format and image integrity.
+    2. Runs neural network inference with concurrency lock.
+    3. Securely logs the image and metadata (UUID filename) into SQLite database.
+    4. Returns prediction verdict and confidence percentages.
+    """
     pred = get_model()
     if pred is None:
         return jsonify({"error": "Model initialization failed."}), 500
 
     if "image" not in request.files:
-        return jsonify({"error": "No image file uploaded in request."}), 400
+        return jsonify({"error": "No image file provided in upload request."}), 400
 
     file = request.files["image"]
-    if file.filename == "":
+    original_filename = file.filename or "upload.jpg"
+    if original_filename.strip() == "":
         return jsonify({"error": "Empty filename."}), 400
 
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
+    # Extension check
+    _, ext = os.path.splitext(original_filename.lower())
+    if ext not in ALLOWED_EXTENSIONS:
+        return jsonify({
+            "error": f"Unsupported file type '{ext}'. Allowed extensions: {', '.join(ALLOWED_EXTENSIONS)}"
+        }), 400
+
+    # Generate random unique filename for storage (never use original filename)
+    uuid_filename = f"{uuid.uuid4().hex}{ext}"
+    permanent_upload_path = os.path.join(UPLOADS_DIR, uuid_filename)
+
+    # Temporary working file for PIL validation and prediction
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
     tmp_path = tmp.name
     tmp.close()
-    file.save(tmp_path)
 
     try:
-        # Serialized inference: multiple users queue smoothly instead of spiking RAM beyond 512MB
+        # Save user stream to disk
+        file.save(tmp_path)
+        file_size = os.path.getsize(tmp_path)
+
+        # Image content integrity check using PIL
+        try:
+            with Image.open(tmp_path) as img:
+                img.verify()
+        except Exception:
+            return jsonify({"error": "Uploaded file is corrupted or not a valid image."}), 400
+
+        # Copy verified image to uploads/ with randomized UUID
+        try:
+            with open(tmp_path, "rb") as src_f, open(permanent_upload_path, "wb") as dst_f:
+                dst_f.write(src_f.read())
+        except Exception as e:
+            print(f"[WARNING] Could not save upload copy: {e}")
+
+        # Serialized inference: multiple users queue smoothly without spiking RAM beyond 512MB
         with _predict_lock:
             result = pred.predict(tmp_path)
+
+        # Log metadata in SQLite database
+        client_ip = get_client_ip()
+        session_id = request.cookies.get("session_id") or uuid.uuid4().hex[:16]
+
+        try:
+            record_prediction(
+                uuid_filename=uuid_filename,
+                original_filename=secure_filename(original_filename),
+                file_size=file_size,
+                prediction=result.get("label", "Unknown"),
+                confidence=result.get("confidence", 0.0),
+                probabilities=result.get("probabilities", {}),
+                ip_address=client_ip,
+                session_id=session_id,
+                mime_type=file.mimetype or "image/jpeg"
+            )
+        except Exception as db_err:
+            print(f"[ERROR] Failed to log prediction to database: {db_err}")
+
         gc.collect()
-        return jsonify(result)
+
+        response = jsonify(result)
+        # Ensure session ID cookie is set on client for audit correlation
+        if not request.cookies.get("session_id"):
+            response.set_cookie("session_id", session_id, max_age=30*24*3600, httponly=True, samesite="Lax")
+        return response
+
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -583,13 +260,306 @@ def predict():
                 pass
 
 
+# ==============================================================================
+# SECURE ADMIN AUTHENTICATION ROUTES
+# ==============================================================================
+
+@app.route("/admin/login", methods=["GET", "POST"])
+def admin_login():
+    """
+    Administrator Sign-In:
+    - Session-based authentication (single owner account from .env).
+    - Rate-limiting: locks out after 5 consecutive failed attempts for 15 minutes.
+    - CSRF protection enabled.
+    """
+    if current_user.is_authenticated:
+        return redirect(url_for("admin_dashboard"))
+
+    client_ip = get_client_ip()
+    is_locked, remaining_secs = is_ip_locked_out(client_ip, max_attempts=5, lockout_minutes=15)
+    remaining_minutes = int(remaining_secs / 60) + 1 if is_locked else 0
+
+    if request.method == "POST":
+        if is_locked:
+            flash(f"Access blocked due to excessive failed attempts. Please wait {remaining_minutes} minute(s).", "danger")
+            return render_template("admin/login.html", is_locked=True, remaining_minutes=remaining_minutes)
+
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+
+        if verify_admin_credentials(username, password):
+            record_login_attempt(client_ip, username, success=True)
+            login_user(AdminUser(username), remember=False)
+            flash("Signed in successfully to the Admin Console.", "success")
+            next_page = request.args.get("next")
+            if next_page and next_page.startswith("/admin"):
+                return redirect(next_page)
+            return redirect(url_for("admin_dashboard"))
+        else:
+            record_login_attempt(client_ip, username, success=False)
+            failed_count = get_failed_attempts_count(client_ip, lockout_minutes=15)
+            remaining_attempts = max(0, 5 - failed_count)
+
+            if remaining_attempts == 0:
+                flash("Maximum failed attempts reached. Your IP has been temporarily locked out for 15 minutes.", "danger")
+                return render_template("admin/login.html", is_locked=True, remaining_minutes=15)
+            else:
+                flash(f"Invalid administrator credentials. {remaining_attempts} attempt(s) remaining before lockout.", "danger")
+                return render_template("admin/login.html", is_locked=False, remaining_minutes=0)
+
+    return render_template("admin/login.html", is_locked=is_locked, remaining_minutes=remaining_minutes)
+
+
+@app.route("/admin/logout", methods=["POST"])
+@login_required
+def admin_logout():
+    """Signs out the administrator and terminates the session."""
+    logout_user()
+    flash("You have been signed out.", "success")
+    return redirect(url_for("admin_login"))
+
+
+# ==============================================================================
+# PROTECTED ADMIN DASHBOARD & MANAGEMENT ROUTES
+# ==============================================================================
+
+@app.route("/admin", methods=["GET"])
+@login_required
+def admin_dashboard():
+    """
+    Main Administrator Dashboard:
+    - Summary analytics (total count, real %, AI %, average confidence, trend chart).
+    - Submissions table with search, filter (real/fake, date range, training status), sorting, and pagination.
+    """
+    page = request.args.get("page", 1, type=int)
+    per_page = 15
+
+    search_query = request.args.get("search", "").strip()
+    prediction_filter = request.args.get("prediction", "").strip()
+    training_filter = request.args.get("training_status", "").strip()
+    sort_by = request.args.get("sort_by", "newest").strip()
+    start_date_str = request.args.get("start_date", "").strip()
+    end_date_str = request.args.get("end_date", "").strip()
+
+    # Base query
+    query = PredictionLog.query
+
+    # Search filter
+    if search_query:
+        search_pattern = f"%{search_query}%"
+        query = query.filter(
+            db.or_(
+                PredictionLog.original_filename.ilike(search_pattern),
+                PredictionLog.ip_address.ilike(search_pattern),
+                PredictionLog.uuid_filename.ilike(search_pattern)
+            )
+        )
+
+    # Class filter
+    if prediction_filter in ("Real", "AI-generated"):
+        query = query.filter(PredictionLog.prediction == prediction_filter)
+
+    # Training ingestion filter
+    if training_filter:
+        query = query.filter(PredictionLog.training_status == training_filter)
+
+    # Date range filters
+    if start_date_str:
+        try:
+            start_dt = datetime.strptime(start_date_str, "%Y-%m-%d")
+            query = query.filter(PredictionLog.timestamp >= start_dt)
+        except ValueError:
+            pass
+
+    if end_date_str:
+        try:
+            end_dt = datetime.strptime(end_date_str, "%Y-%m-%d") + timedelta(days=1)
+            query = query.filter(PredictionLog.timestamp < end_dt)
+        except ValueError:
+            pass
+
+    # Sorting
+    if sort_by == "oldest":
+        query = query.order_by(PredictionLog.timestamp.asc())
+    elif sort_by == "conf_high":
+        query = query.order_by(PredictionLog.confidence.desc())
+    elif sort_by == "conf_low":
+        query = query.order_by(PredictionLog.confidence.asc())
+    elif sort_by == "size_desc":
+        query = query.order_by(PredictionLog.file_size.desc())
+    else:  # newest first
+        query = query.order_by(PredictionLog.timestamp.desc())
+
+    # Paginate
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    logs = pagination.items
+
+    stats = get_summary_statistics()
+
+    return render_template(
+        "admin/dashboard.html",
+        logs=logs,
+        pagination=pagination,
+        stats=stats,
+        search_query=search_query,
+        prediction_filter=prediction_filter,
+        training_filter=training_filter,
+        sort_by=sort_by,
+        start_date=start_date_str,
+        end_date=end_date_str
+    )
+
+
+@app.route("/admin/image/<filename>", methods=["GET"])
+@login_required
+def admin_image(filename):
+    """Serve full-resolution stored image from protected uploads/ directory."""
+    # Prevent directory traversal attacks
+    if ".." in filename or "/" in filename or "\\" in filename:
+        abort(400)
+    return send_from_directory(UPLOADS_DIR, filename)
+
+
+@app.route("/admin/thumbnail/<filename>", methods=["GET"])
+@login_required
+def admin_thumbnail(filename):
+    """
+    Serve or generate on-the-fly small cached thumbnail (100x100).
+    Keeps dashboard memory usage minimal even with hundreds of user uploads.
+    """
+    if ".." in filename or "/" in filename or "\\" in filename:
+        abort(400)
+
+    thumb_path = os.path.join(THUMBNAILS_DIR, filename)
+    src_path = os.path.join(UPLOADS_DIR, filename)
+
+    if not os.path.exists(thumb_path) and os.path.exists(src_path):
+        try:
+            with Image.open(src_path) as img:
+                img = img.convert("RGB")
+                img.thumbnail((120, 120), Image.Resampling.LANCZOS)
+                img.save(thumb_path, format="JPEG", quality=85)
+        except Exception as e:
+            print(f"[WARNING] Could not create thumbnail for {filename}: {e}")
+            return send_from_directory(UPLOADS_DIR, filename)
+
+    if os.path.exists(thumb_path):
+        return send_from_directory(THUMBNAILS_DIR, filename)
+    return send_from_directory(UPLOADS_DIR, filename)
+
+
+@app.route("/admin/move/<int:log_id>/<string:target_class>", methods=["POST"])
+@login_required
+def admin_move_to_dataset(log_id, target_class):
+    """
+    Dataset Ingestion Action:
+    Copies an uploaded image into database/train/REAL or database/train/FAKE
+    so the owner can retrain or fine-tune models on new user inputs.
+    """
+    success, message = move_image_to_dataset(log_id, target_class, database_dir="database")
+    if success:
+        flash(message, "success")
+    else:
+        flash(message, "danger")
+
+    return redirect(request.referrer or url_for("admin_dashboard"))
+
+
+@app.route("/admin/delete/<int:log_id>", methods=["POST"])
+@login_required
+def admin_delete_log(log_id):
+    """Permanently delete a submission log record and its stored upload file."""
+    log = PredictionLog.query.get_or_404(log_id)
+    uuid_filename = log.uuid_filename
+
+    # Delete physical file from uploads/
+    img_path = os.path.join(UPLOADS_DIR, uuid_filename)
+    if os.path.exists(img_path):
+        try:
+            os.remove(img_path)
+        except OSError as e:
+            gc.collect()
+            try:
+                os.remove(img_path)
+            except OSError as e2:
+                print(f"[WARNING] Could not delete image file: {e2}")
+
+    # Delete thumbnail
+    thumb_path = os.path.join(THUMBNAILS_DIR, uuid_filename)
+    if os.path.exists(thumb_path):
+        try:
+            os.remove(thumb_path)
+        except OSError:
+            pass
+
+    # Delete database record
+    db.session.delete(log)
+    db.session.commit()
+
+    flash(f"Record #{log_id} and its associated file were permanently removed.", "success")
+    return redirect(request.referrer or url_for("admin_dashboard"))
+
+
+@app.route("/admin/export-csv", methods=["GET"])
+@login_required
+def admin_export_csv():
+    """Export complete submissions audit log as a downloadable CSV file."""
+    logs = PredictionLog.query.order_by(PredictionLog.timestamp.desc()).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "ID",
+        "Timestamp (UTC)",
+        "Original Filename",
+        "Stored UUID Filename",
+        "File Size (Bytes)",
+        "Verdict",
+        "Confidence (%)",
+        "Prob Real (%)",
+        "Prob AI-Generated (%)",
+        "Client IP",
+        "Session ID",
+        "Training Dataset Status"
+    ])
+
+    for log in logs:
+        writer.writerow([
+            log.id,
+            log.timestamp.strftime("%Y-%m-%d %H:%M:%S") if log.timestamp else "",
+            log.original_filename,
+            log.uuid_filename,
+            log.file_size,
+            log.prediction,
+            log.confidence,
+            log.prob_real,
+            log.prob_fake,
+            log.ip_address,
+            log.session_id,
+            log.training_status
+        ])
+
+    csv_data = output.getvalue()
+    filename = f"detector_submissions_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"
+    return Response(
+        csv_data,
+        mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+# ==============================================================================
+# MAIN ENTRYPOINT
+# ==============================================================================
+
 if __name__ == "__main__":
     url = f"http://{HOST}:{PORT}"
-    print("\n" + "=" * 60)
-    print(f" 🚀 AI-Generated Image Detector Web GUI is LIVE!")
-    print(f" 👉 URL: {url}")
-    print(f" Press Ctrl+C in this terminal to stop the server.")
-    print("=" * 60 + "\n")
+    print("\n" + "=" * 65)
+    print(" 🚀 AI-Generated Image Detector & Admin Console is LIVE!")
+    print(f" 👉 Public Web Interface : {url}")
+    print(f" 👉 Admin Portal URL      : {url}/admin")
+    print(" Press Ctrl+C in this terminal to stop the server.")
+    print("=" * 65 + "\n")
 
     try:
         webbrowser.open(url)
@@ -597,4 +567,3 @@ if __name__ == "__main__":
         pass
 
     app.run(host=HOST, port=PORT, debug=False)
-

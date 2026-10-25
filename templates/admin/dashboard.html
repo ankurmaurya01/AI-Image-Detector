@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard - AI Image Detector</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Chart.js for Activity Chart -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card: #131b2e;
+      --card-alt: #172138;
+      --border: #1e293b;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --real: #10b981;
+      --real-bg: rgba(16, 185, 129, 0.15);
+      --fake: #f43f5e;
+      --fake-bg: rgba(244, 63, 94, 0.15);
+      --warning: #f59e0b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
+    body {
+      background: #0b0f19;
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    /* Top Navbar */
+    .navbar {
+      background: #101626;
+      border-bottom: 1px solid var(--border);
+      padding: 16px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 40;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand-logo {
+      width: 38px;
+      height: 38px;
+      background: rgba(99, 102, 241, 0.2);
+      border: 1px solid rgba(99, 102, 241, 0.4);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+    .brand-title {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+    }
+    .brand-badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: rgba(99, 102, 241, 0.15);
+      color: #818cf8;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      text-transform: uppercase;
+    }
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .user-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--muted);
+      background: var(--card);
+      border: 1px solid var(--border);
+      padding: 6px 14px;
+      border-radius: 9999px;
+    }
+    .user-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--real);
+    }
+    .btn {
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: none;
+      transition: all 0.2s;
+    }
+    .btn-secondary {
+      background: #1e293b;
+      color: #cbd5e1;
+      border: 1px solid #334155;
+    }
+    .btn-secondary:hover {
+      background: #334155;
+      color: #fff;
+    }
+    .btn-danger {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+    .btn-danger:hover {
+      background: #ef4444;
+      color: #fff;
+    }
+    .btn-primary {
+      background: var(--primary);
+      color: #fff;
+    }
+    .btn-primary:hover {
+      background: var(--primary-hover);
+    }
+    .btn-success {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .btn-success:hover {
+      background: #10b981;
+      color: #fff;
+    }
+
+    /* Layout */
+    .main-content {
+      max-width: 1400px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 32px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+
+    /* Flash Alerts */
+    .alert {
+      padding: 12px 18px;
+      border-radius: 12px;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .alert-success {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: #6ee7b7;
+    }
+    .alert-danger {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #fca5a5;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 20px;
+    }
+    .stat-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+    }
+    .stat-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .stat-icon {
+      font-size: 20px;
+    }
+    .stat-value {
+      font-size: 32px;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: -0.02em;
+    }
+    .stat-footer {
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Chart Section */
+    .chart-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+    }
+    .chart-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* Filter & Search Bar */
+    .filter-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px 24px;
+    }
+    .filter-form {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr 1.5fr auto;
+      gap: 16px;
+      align-items: flex-end;
+    }
+    @media (max-width: 1024px) {
+      .filter-form {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+    @media (max-width: 640px) {
+      .filter-form {
+        grid-template-columns: 1fr;
+      }
+    }
+    .form-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .form-field label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .form-field input, .form-field select {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid #334155;
+      border-radius: 8px;
+      color: var(--text);
+      padding: 10px 12px;
+      font-size: 13px;
+      outline: none;
+    }
+    .form-field input:focus, .form-field select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+    }
+    .filter-buttons {
+      display: flex;
+      gap: 10px;
+    }
+
+    /* Table Section */
+    .table-container {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+    .table-header-bar {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .table-title {
+      font-size: 17px;
+      font-weight: 700;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 13px;
+    }
+    th {
+      background: #0f172a;
+      padding: 14px 18px;
+      color: var(--muted);
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 16px 18px;
+      border-bottom: 1px solid #1e293b;
+      vertical-align: middle;
+    }
+    tr:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .thumbnail {
+      width: 54px;
+      height: 54px;
+      border-radius: 8px;
+      object-fit: cover;
+      cursor: pointer;
+      border: 1px solid #334155;
+      background: #0f172a;
+      transition: transform 0.2s;
+    }
+    .thumbnail:hover {
+      transform: scale(1.08);
+      border-color: var(--primary);
+    }
+    .badge-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .badge-real {
+      background: var(--real-bg);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .badge-fake {
+      background: var(--fake-bg);
+      color: #fb7185;
+      border: 1px solid rgba(244, 63, 94, 0.3);
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .status-none {
+      background: #1e293b;
+      color: #94a3b8;
+    }
+    .status-train-real {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .status-train-fake {
+      background: rgba(244, 63, 94, 0.15);
+      color: #fb7185;
+      border: 1px solid rgba(244, 63, 94, 0.3);
+    }
+    .action-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .action-btn {
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s;
+    }
+
+    /* Pagination */
+    .pagination-bar {
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #0f172a;
+      border-top: 1px solid var(--border);
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .page-nav {
+      display: flex;
+      gap: 6px;
+    }
+    .page-link {
+      padding: 6px 12px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #cbd5e1;
+      text-decoration: none;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .page-link:hover {
+      background: #334155;
+      color: #fff;
+    }
+    .page-link.active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #fff;
+    }
+    .page-link.disabled {
+      opacity: 0.4;
+      pointer-events: none;
+    }
+
+    /* Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-content {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      max-width: 720px;
+      width: 100%;
+      overflow: hidden;
+      animation: modalFade 0.2s ease;
+    }
+    @keyframes modalFade {
+      from { opacity: 0; transform: scale(0.96); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    .modal-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .modal-body {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+    .modal-body img {
+      max-height: 440px;
+      max-width: 100%;
+      border-radius: 10px;
+      border: 1px solid #334155;
+    }
+    .modal-meta {
+      width: 100%;
+      background: #0f172a;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      font-size: 12px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      color: var(--muted);
+    }
+    .modal-meta strong {
+      color: #cbd5e1;
+    }
+  </style>
+</head>
+<body>
+  <!-- Top Navbar -->
+  <nav class="navbar">
+    <div class="brand">
+      <div class="brand-logo">🛡️</div>
+      <div>
+        <div class="brand-title">AI Image Detector</div>
+      </div>
+      <span class="brand-badge">Admin Console</span>
+    </div>
+
+    <div class="nav-actions">
+      <div class="user-pill">
+        <span class="user-dot"></span>
+        <span>Operator: <strong>{{ current_user.username }}</strong></span>
+      </div>
+
+      <a href="{{ url_for('admin_export_csv') }}" class="btn btn-secondary">
+        <span>📥</span> Export CSV
+      </a>
+
+      <form method="POST" action="{{ url_for('admin_logout') }}" style="margin: 0;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <button type="submit" class="btn btn-danger">
+          <span>🚪</span> Logout
+        </button>
+      </form>
+    </div>
+  </nav>
+
+  <main class="main-content">
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ 'danger' if category in ['error', 'danger'] else category }}">
+            <span>{{ '⚠️' if category in ['warning', 'error', 'danger'] else '✅' }}</span>
+            <div>{{ message }}</div>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <!-- Summary Stats Grid -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-header">
+          <span>TOTAL SUBMISSIONS</span>
+          <span class="stat-icon">📊</span>
+        </div>
+        <div class="stat-value">{{ stats.total_submissions }}</div>
+        <div class="stat-footer">
+          <span>Logged inputs across all sessions</span>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-header">
+          <span>AUTHENTIC (REAL)</span>
+          <span class="stat-icon">📷</span>
+        </div>
+        <div class="stat-value" style="color: #34d399;">
+          {{ stats.real_count }} <span style="font-size: 16px; font-weight: 600; color: var(--muted);">({{ stats.real_percentage }}%)</span>
+        </div>
+        <div class="stat-footer">
+          <span>Verified authentic photographic uploads</span>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-header">
+          <span>AI-GENERATED (SYNTHETIC)</span>
+          <span class="stat-icon">🤖</span>
+        </div>
+        <div class="stat-value" style="color: #fb7185;">
+          {{ stats.fake_count }} <span style="font-size: 16px; font-weight: 600; color: var(--muted);">({{ stats.fake_percentage }}%)</span>
+        </div>
+        <div class="stat-footer">
+          <span>Synthetic neural network generation detected</span>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-header">
+          <span>AVERAGE CONFIDENCE</span>
+          <span class="stat-icon">🎯</span>
+        </div>
+        <div class="stat-value" style="color: #818cf8;">
+          {{ stats.average_confidence }}%
+        </div>
+        <div class="stat-footer">
+          <span>Mean model prediction certainty</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Submissions Trend Chart -->
+    <div class="chart-card">
+      <div class="chart-title">
+        <span>📈 Submissions Activity (Last 14 Days)</span>
+        <span style="font-size: 12px; color: var(--muted); font-weight: 500;">Daily verification volume</span>
+      </div>
+      <div style="height: 180px; position: relative;">
+        <canvas id="dailyChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Filter & Search Controls -->
+    <div class="filter-card">
+      <form method="GET" action="{{ url_for('admin_dashboard') }}" class="filter-form">
+        <div class="form-field">
+          <label for="search">Search</label>
+          <input type="text" id="search" name="search" value="{{ search_query }}" placeholder="Original filename, IP, or UUID...">
+        </div>
+
+        <div class="form-field">
+          <label for="prediction">Verdict</label>
+          <select id="prediction" name="prediction">
+            <option value="" {% if not prediction_filter %}selected{% endif %}>All Predictions</option>
+            <option value="Real" {% if prediction_filter == 'Real' %}selected{% endif %}>Authentic Real</option>
+            <option value="AI-generated" {% if prediction_filter == 'AI-generated' %}selected{% endif %}>AI-Generated</option>
+          </select>
+        </div>
+
+        <div class="form-field">
+          <label for="training_status">Dataset Status</label>
+          <select id="training_status" name="training_status">
+            <option value="" {% if not training_filter %}selected{% endif %}>All Records</option>
+            <option value="none" {% if training_filter == 'none' %}selected{% endif %}>Not in Dataset</option>
+            <option value="train_real" {% if training_filter == 'train_real' %}selected{% endif %}>Added to Train/Real</option>
+            <option value="train_fake" {% if training_filter == 'train_fake' %}selected{% endif %}>Added to Train/Fake</option>
+          </select>
+        </div>
+
+        <div class="form-field">
+          <label for="sort_by">Sort By</label>
+          <select id="sort_by" name="sort_by">
+            <option value="newest" {% if sort_by == 'newest' %}selected{% endif %}>Newest First</option>
+            <option value="oldest" {% if sort_by == 'oldest' %}selected{% endif %}>Oldest First</option>
+            <option value="conf_high" {% if sort_by == 'conf_high' %}selected{% endif %}>Highest Confidence</option>
+            <option value="conf_low" {% if sort_by == 'conf_low' %}selected{% endif %}>Lowest Confidence</option>
+            <option value="size_desc" {% if sort_by == 'size_desc' %}selected{% endif %}>Largest Size</option>
+          </select>
+        </div>
+
+        <div class="form-field">
+          <label>Date Range</label>
+          <div style="display: flex; gap: 6px;">
+            <input type="date" name="start_date" value="{{ start_date }}" style="width: 50%;">
+            <input type="date" name="end_date" value="{{ end_date }}" style="width: 50%;">
+          </div>
+        </div>
+
+        <div class="filter-buttons">
+          <button type="submit" class="btn btn-primary">Filter</button>
+          <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">Reset</a>
+        </div>
+      </form>
+    </div>
+
+    <!-- Submissions Table -->
+    <div class="table-container">
+      <div class="table-header-bar">
+        <div class="table-title">Submitted Images Audit Log</div>
+        <div style="font-size: 13px; color: var(--muted);">
+          Total Matching: <strong>{{ pagination.total }}</strong>
+        </div>
+      </div>
+
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Preview</th>
+              <th>ID & Timestamp</th>
+              <th>Original File & Size</th>
+              <th>Prediction Verdict</th>
+              <th>Confidence</th>
+              <th>Client IP / Session</th>
+              <th>Dataset Status</th>
+              <th style="text-align: right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if logs %}
+              {% for log in logs %}
+                <tr>
+                  <td>
+                    <img src="{{ url_for('admin_thumbnail', filename=log.uuid_filename) }}" 
+                         alt="Thumbnail" 
+                         class="thumbnail"
+                         onclick="openModal('{{ url_for('admin_image', filename=log.uuid_filename) }}', '{{ log.original_filename }}', '{{ log.formatted_size() }}', '{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC') }}', '{{ log.ip_address }}', '{{ log.prediction }}', '{{ log.confidence }}%')">
+                  </td>
+                  <td>
+                    <div style="font-weight: 700; color: #fff;">#{{ log.id }}</div>
+                    <div style="font-size: 11px; color: var(--muted);">{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</div>
+                  </td>
+                  <td>
+                    <div style="max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600;" title="{{ log.original_filename }}">
+                      {{ log.original_filename }}
+                    </div>
+                    <div style="font-size: 11px; color: var(--muted);">{{ log.formatted_size() }}</div>
+                  </td>
+                  <td>
+                    <span class="badge-pill {{ 'badge-real' if log.prediction == 'Real' else 'badge-fake' }}">
+                      {{ '🟢' if log.prediction == 'Real' else '🔴' }} {{ log.prediction }}
+                    </span>
+                  </td>
+                  <td>
+                    <div style="font-weight: 700;">{{ "%.1f"|format(log.confidence) }}%</div>
+                    <div style="width: 70px; height: 5px; background: #334155; border-radius: 9999px; margin-top: 4px; overflow: hidden;">
+                      <div style="width: {{ log.confidence }}%; height: 100%; background: {{ '#10b981' if log.prediction == 'Real' else '#f43f5e' }};"></div>
+                    </div>
+                  </td>
+                  <td>
+                    <div style="font-family: monospace; font-size: 12px; color: #cbd5e1;">{{ log.ip_address }}</div>
+                    <div style="font-size: 11px; color: var(--muted);" title="{{ log.session_id }}">
+                      {{ log.session_id[:10] }}...
+                    </div>
+                  </td>
+                  <td>
+                    {% if log.training_status == 'train_real' %}
+                      <span class="status-badge status-train-real">✔ In Train/REAL</span>
+                    {% elif log.training_status == 'train_fake' %}
+                      <span class="status-badge status-train-fake">✔ In Train/FAKE</span>
+                    {% else %}
+                      <span class="status-badge status-none">Not Added</span>
+                    {% endif %}
+                  </td>
+                  <td style="text-align: right;">
+                    <div class="action-group" style="justify-content: flex-end;">
+                      <!-- View Full Size -->
+                      <a href="{{ url_for('admin_image', filename=log.uuid_filename) }}" target="_blank" class="action-btn btn-secondary" title="View Full Size">
+                        👁️
+                      </a>
+
+                      <!-- Move to Train Real -->
+                      <form method="POST" action="{{ url_for('admin_move_to_dataset', log_id=log.id, target_class='real') }}" style="margin: 0;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <button type="submit" class="action-btn btn-success" title="Add as new training data in database/train/REAL">
+                          ➕ Real
+                        </button>
+                      </form>
+
+                      <!-- Move to Train Fake -->
+                      <form method="POST" action="{{ url_for('admin_move_to_dataset', log_id=log.id, target_class='fake') }}" style="margin: 0;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <button type="submit" class="action-btn btn-danger" title="Add as new training data in database/train/FAKE">
+                          ➕ Fake
+                        </button>
+                      </form>
+
+                      <!-- Delete Record -->
+                      <form method="POST" action="{{ url_for('admin_delete_log', log_id=log.id) }}" style="margin: 0;" onsubmit="return confirm('Delete this record and image permanently?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <button type="submit" class="action-btn btn-secondary" style="color: #f87171;" title="Delete Record">
+                          🗑️
+                        </button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+            {% else %}
+              <tr>
+                <td colspan="8" style="text-align: center; padding: 48px; color: var(--muted);">
+                  <div style="font-size: 32px; margin-bottom: 8px;">📭</div>
+                  <div>No image submission records match the selected filters.</div>
+                </td>
+              </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination Bar -->
+      <div class="pagination-bar">
+        <div>
+          Showing page <strong>{{ pagination.page }}</strong> of <strong>{{ pagination.pages or 1 }}</strong> ({{ pagination.total }} total items)
+        </div>
+
+        <div class="page-nav">
+          <!-- Previous Page -->
+          <a href="{{ url_for('admin_dashboard', page=pagination.prev_num, search=search_query, prediction=prediction_filter, training_status=training_filter, sort_by=sort_by, start_date=start_date, end_date=end_date) if pagination.has_prev else '#' }}" 
+             class="page-link {{ '' if pagination.has_prev else 'disabled' }}">
+            &laquo; Prev
+          </a>
+
+          <!-- Page Numbers -->
+          {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+            {% if p %}
+              <a href="{{ url_for('admin_dashboard', page=p, search=search_query, prediction=prediction_filter, training_status=training_filter, sort_by=sort_by, start_date=start_date, end_date=end_date) }}" 
+                 class="page-link {{ 'active' if p == pagination.page else '' }}">
+                {{ p }}
+              </a>
+            {% else %}
+              <span class="page-link disabled">&hellip;</span>
+            {% endif %}
+          {% endfor %}
+
+          <!-- Next Page -->
+          <a href="{{ url_for('admin_dashboard', page=pagination.next_num, search=search_query, prediction=prediction_filter, training_status=training_filter, sort_by=sort_by, start_date=start_date, end_date=end_date) if pagination.has_next else '#' }}" 
+             class="page-link {{ '' if pagination.has_next else 'disabled' }}">
+            Next &raquo;
+          </a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Full Image Preview Modal -->
+  <div id="imageModal" class="modal" onclick="closeModal(event)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <strong id="modalTitle">Image Details</strong>
+        <button class="btn btn-secondary" onclick="closeModal()" style="padding: 4px 10px;">✕</button>
+      </div>
+      <div class="modal-body">
+        <img id="modalImg" src="" alt="Full view">
+        <div class="modal-meta">
+          <div><strong>Original Filename:</strong> <span id="metaFilename"></span></div>
+          <div><strong>File Size:</strong> <span id="metaSize"></span></div>
+          <div><strong>Submission Time:</strong> <span id="metaTime"></span></div>
+          <div><strong>Client IP:</strong> <span id="metaIp"></span></div>
+          <div><strong>Verdict:</strong> <span id="metaVerdict"></span></div>
+          <div><strong>Confidence:</strong> <span id="metaConf"></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Activity Chart Initialization
+    const ctx = document.getElementById('dailyChart');
+    if (ctx) {
+      const dates = {{ stats.chart_dates | tojson }};
+      const counts = {{ stats.chart_counts | tojson }};
+      
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: dates,
+          datasets: [{
+            label: 'Daily Submissions',
+            data: counts,
+            borderColor: '#6366f1',
+            backgroundColor: 'rgba(99, 102, 241, 0.15)',
+            fill: true,
+            tension: 0.35,
+            borderWidth: 2,
+            pointBackgroundColor: '#818cf8',
+            pointRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            x: {
+              grid: { color: 'rgba(255, 255, 255, 0.05)' },
+              ticks: { color: '#94a3b8', font: { size: 11 } }
+            },
+            y: {
+              beginAtZero: true,
+              grid: { color: 'rgba(255, 255, 255, 0.05)' },
+              ticks: { color: '#94a3b8', font: { size: 11 }, stepSize: 1 }
+            }
+          }
+        }
+      });
+    }
+
+    // Modal logic
+    function openModal(imgUrl, filename, size, time, ip, verdict, conf) {
+      document.getElementById('modalImg').src = imgUrl;
+      document.getElementById('modalTitle').textContent = filename;
+      document.getElementById('metaFilename').textContent = filename;
+      document.getElementById('metaSize').textContent = size;
+      document.getElementById('metaTime').textContent = time;
+      document.getElementById('metaIp').textContent = ip;
+      document.getElementById('metaVerdict').textContent = verdict;
+      document.getElementById('metaConf').textContent = conf;
+      document.getElementById('imageModal').style.display = 'flex';
+    }
+
+    function closeModal() {
+      document.getElementById('imageModal').style.display = 'none';
+      document.getElementById('modalImg').src = '';
+    }
+
+    // Close on Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeModal();
+    });
+  </script>
+</body>
+</html>
