@@ -8,6 +8,9 @@ import os
 from flask_login import LoginManager, UserMixin
 from werkzeug.security import check_password_hash, generate_password_hash
 
+# Default hash for initial setup (corresponds to password: Admin123!)
+DEFAULT_ADMIN_PASSWORD_HASH = "scrypt:32768:8:1$M5CU0V2JDOgE3zTH$f9caf9f49a4f605e8bdf632b82f5e1946e7bbdf0a2b229171496c0d64e3afa7183c173db5477e3302a405316b263edb0fb4f8e51d483056f503faf877b9404bd"
+
 login_manager = LoginManager()
 
 
@@ -44,9 +47,9 @@ def init_auth(app):
 
 
 def verify_admin_credentials(username: str, password: str) -> bool:
-    """Verify input credentials against environment variables."""
+    """Verify input credentials against environment variables or default hash."""
     expected_username = os.environ.get("ADMIN_USERNAME", "admin").strip()
-    password_hash = os.environ.get("ADMIN_PASSWORD_HASH", "").strip()
+    password_hash = os.environ.get("ADMIN_PASSWORD_HASH", DEFAULT_ADMIN_PASSWORD_HASH).strip()
 
     if not expected_username or not password_hash:
         return False
