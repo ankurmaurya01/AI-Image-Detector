@@ -60,7 +60,7 @@ app = Flask(__name__)
 application = app  # WSGI compatibility alias
 
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-insecure-secret-key-change-in-env")
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + os.path.abspath("admin_data.db")
+app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", "sqlite:///admin_data.db")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["MAX_CONTENT_LENGTH"] = int(os.environ.get("MAX_CONTENT_LENGTH", 10 * 1024 * 1024))  # 10 MB limit
 

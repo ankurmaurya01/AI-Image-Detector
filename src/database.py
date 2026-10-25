@@ -114,18 +114,27 @@ class GeneralFeedback(db.Model):
 
 def init_db(app):
     """Initialize database and ensure directories exist."""
-    os.makedirs(UPLOADS_DIR, exist_ok=True)
-    os.makedirs(THUMBNAILS_DIR, exist_ok=True)
+    try:
+        os.makedirs(UPLOADS_DIR, exist_ok=True)
+        os.makedirs(THUMBNAILS_DIR, exist_ok=True)
+    except Exception as e:
+        print(f"[WARNING] Could not create uploads directories: {e}")
 
     db.init_app(app)
     with app.app_context():
-        # Enable WAL mode on SQLite for high-concurrency read/write
-        engine = db.engine
-        if "sqlite" in engine.url.drivername:
-            with engine.connect() as conn:
-                conn.exec_driver_sql("PRAGMA journal_mode=WAL;")
-                conn.exec_driver_sql("PRAGMA synchronous=NORMAL;")
-        db.create_all()
+        try:
+            engine = db.engine
+            if "sqlite" in engine.url.drivername:
+                with engine.connect() as conn:
+                    conn.exec_driver_sql("PRAGMA journal_mode=WAL;")
+                    conn.exec_driver_sql("PRAGMA synchronous=NORMAL;")
+        except Exception as wal_err:
+            print(f"[INFO] WAL mode pragma skipped: {wal_err}")
+
+        try:
+            db.create_all()
+        except Exception as db_err:
+            print(f"[ERROR] Database create_all error: {db_err}")
 
 
 def record_prediction(
