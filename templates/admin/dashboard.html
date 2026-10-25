@@ -3,17 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin Dashboard - AI Image Detector</title>
+  <title>Admin Command Console - AI Image Detector</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <!-- Chart.js for Activity Chart -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     :root {
       --bg: #0b0f19;
       --card: #131b2e;
-      --card-alt: #172138;
       --border: #1e293b;
       --text: #f8fafc;
       --muted: #94a3b8;
@@ -23,30 +21,29 @@
       --real-bg: rgba(16, 185, 129, 0.15);
       --fake: #f43f5e;
       --fake-bg: rgba(244, 63, 94, 0.15);
-      --warning: #f59e0b;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
     body {
-      background: #0b0f19;
+      background: #090d16;
       color: var(--text);
       min-height: 100vh;
       display: flex;
       flex-direction: column;
     }
-    
     /* Top Navbar */
     .navbar {
-      background: #101626;
+      background: rgba(19, 27, 46, 0.9);
+      backdrop-filter: blur(12px);
       border-bottom: 1px solid var(--border);
-      padding: 16px 32px;
+      padding: 14px 28px;
       display: flex;
       justify-content: space-between;
       align-items: center;
       position: sticky;
       top: 0;
-      z-index: 40;
+      z-index: 100;
     }
-    .brand {
+    .brand-section {
       display: flex;
       align-items: center;
       gap: 12px;
@@ -105,129 +102,98 @@
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
-      text-decoration: none;
       display: inline-flex;
       align-items: center;
       gap: 6px;
       border: none;
       transition: all 0.2s;
+      text-decoration: none;
     }
-    .btn-secondary {
-      background: #1e293b;
-      color: #cbd5e1;
-      border: 1px solid #334155;
-    }
-    .btn-secondary:hover {
-      background: #334155;
-      color: #fff;
-    }
-    .btn-danger {
-      background: rgba(239, 68, 68, 0.15);
-      color: #f87171;
-      border: 1px solid rgba(239, 68, 68, 0.3);
-    }
-    .btn-danger:hover {
-      background: #ef4444;
-      color: #fff;
-    }
-    .btn-primary {
-      background: var(--primary);
-      color: #fff;
-    }
-    .btn-primary:hover {
-      background: var(--primary-hover);
-    }
-    .btn-success {
-      background: rgba(16, 185, 129, 0.15);
-      color: #34d399;
-      border: 1px solid rgba(16, 185, 129, 0.3);
-    }
-    .btn-success:hover {
-      background: #10b981;
-      color: #fff;
-    }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-secondary { background: #1e293b; color: #cbd5e1; border: 1px solid #334155; }
+    .btn-secondary:hover { background: #334155; color: white; }
+    .btn-success { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .btn-success:hover { background: rgba(16, 185, 129, 0.35); }
+    .btn-danger { background: rgba(244, 63, 94, 0.2); color: #fb7185; border: 1px solid rgba(244, 63, 94, 0.3); }
+    .btn-danger:hover { background: rgba(244, 63, 94, 0.35); }
 
-    /* Layout */
+    /* Main Container */
     .main-content {
-      max-width: 1400px;
+      flex: 1;
+      padding: 28px;
+      max-width: 1500px;
       width: 100%;
       margin: 0 auto;
-      padding: 32px 24px;
       display: flex;
       flex-direction: column;
-      gap: 28px;
+      gap: 24px;
     }
 
-    /* Flash Alerts */
+    /* Flash Messages */
     .alert {
       padding: 12px 18px;
-      border-radius: 12px;
+      border-radius: 10px;
       font-size: 14px;
+      font-weight: 500;
       display: flex;
       align-items: center;
       gap: 10px;
     }
-    .alert-success {
-      background: rgba(16, 185, 129, 0.15);
-      border: 1px solid rgba(16, 185, 129, 0.3);
-      color: #6ee7b7;
-    }
-    .alert-danger {
-      background: rgba(239, 68, 68, 0.15);
-      border: 1px solid rgba(239, 68, 68, 0.3);
-      color: #fca5a5;
-    }
+    .alert-success { background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; }
+    .alert-danger { background: rgba(244, 63, 94, 0.15); border: 1px solid rgba(244, 63, 94, 0.3); color: #fb7185; }
+    .alert-warning { background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3); color: #fbbf24; }
 
-    /* Stats Grid */
+    /* Summary Stats Grid */
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 20px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
     }
     .stat-card {
       background: var(--card);
       border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 24px;
+      border-radius: 14px;
+      padding: 20px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+      gap: 6px;
     }
     .stat-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
       color: var(--muted);
-      font-size: 13px;
-      font-weight: 600;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
     }
     .stat-icon {
-      font-size: 20px;
+      font-size: 18px;
     }
     .stat-value {
-      font-size: 32px;
+      font-size: 26px;
       font-weight: 800;
-      color: #fff;
-      letter-spacing: -0.02em;
+      color: var(--text);
     }
     .stat-footer {
       font-size: 12px;
       color: var(--muted);
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 4px;
     }
 
     /* Chart Section */
     .chart-card {
       background: var(--card);
       border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 24px;
+      border-radius: 14px;
+      padding: 20px;
     }
     .chart-title {
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 700;
       margin-bottom: 16px;
       display: flex;
@@ -235,25 +201,25 @@
       align-items: center;
     }
 
-    /* Filter & Search Bar */
+    /* Filter Toolbar */
     .filter-card {
       background: var(--card);
       border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 20px 24px;
+      border-radius: 14px;
+      padding: 18px 22px;
     }
     .filter-form {
       display: grid;
-      grid-template-columns: 2fr 1fr 1fr 1fr 1.5fr auto;
-      gap: 16px;
+      grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1.6fr auto;
+      gap: 12px;
       align-items: flex-end;
     }
-    @media (max-width: 1024px) {
+    @media (max-width: 1200px) {
       .filter-form {
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1fr 1fr 1fr;
       }
     }
-    @media (max-width: 640px) {
+    @media (max-width: 768px) {
       .filter-form {
         grid-template-columns: 1fr;
       }
@@ -264,8 +230,8 @@
       gap: 6px;
     }
     .form-field label {
-      font-size: 12px;
-      font-weight: 600;
+      font-size: 11px;
+      font-weight: 700;
       color: var(--muted);
       text-transform: uppercase;
       letter-spacing: 0.03em;
@@ -275,17 +241,16 @@
       border: 1px solid #334155;
       border-radius: 8px;
       color: var(--text);
-      padding: 10px 12px;
+      padding: 9px 12px;
       font-size: 13px;
       outline: none;
     }
     .form-field input:focus, .form-field select:focus {
       border-color: var(--primary);
-      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
     }
     .filter-buttons {
       display: flex;
-      gap: 10px;
+      gap: 8px;
     }
 
     /* Table Section */
@@ -297,7 +262,7 @@
       box-shadow: 0 10px 30px rgba(0,0,0,0.3);
     }
     .table-header-bar {
-      padding: 20px 24px;
+      padding: 18px 24px;
       border-bottom: 1px solid var(--border);
       display: flex;
       justify-content: space-between;
@@ -306,8 +271,11 @@
       gap: 16px;
     }
     .table-title {
-      font-size: 17px;
+      font-size: 16px;
       font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
     table {
       width: 100%;
@@ -317,7 +285,7 @@
     }
     th {
       background: #0f172a;
-      padding: 14px 18px;
+      padding: 13px 16px;
       color: var(--muted);
       font-weight: 700;
       text-transform: uppercase;
@@ -326,7 +294,7 @@
       border-bottom: 1px solid var(--border);
     }
     td {
-      padding: 16px 18px;
+      padding: 14px 16px;
       border-bottom: 1px solid #1e293b;
       vertical-align: middle;
     }
@@ -334,8 +302,8 @@
       background: rgba(255, 255, 255, 0.02);
     }
     .thumbnail {
-      width: 54px;
-      height: 54px;
+      width: 52px;
+      height: 52px;
       border-radius: 8px;
       object-fit: cover;
       cursor: pointer;
@@ -350,8 +318,8 @@
     .badge-pill {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      padding: 4px 12px;
+      gap: 5px;
+      padding: 4px 10px;
       border-radius: 9999px;
       font-size: 12px;
       font-weight: 700;
@@ -363,6 +331,25 @@
     }
     .badge-fake {
       background: var(--fake-bg);
+      color: #fb7185;
+      border: 1px solid rgba(244, 63, 94, 0.3);
+    }
+    .fb-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .fb-agree {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .fb-disagree {
+      background: rgba(244, 63, 94, 0.15);
       color: #fb7185;
       border: 1px solid rgba(244, 63, 94, 0.3);
     }
@@ -393,9 +380,9 @@
       gap: 6px;
     }
     .action-btn {
-      padding: 6px 10px;
+      padding: 5px 9px;
       border-radius: 6px;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 600;
       border: none;
       cursor: pointer;
@@ -407,7 +394,7 @@
 
     /* Pagination */
     .pagination-bar {
-      padding: 16px 24px;
+      padding: 14px 24px;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -421,7 +408,7 @@
       gap: 6px;
     }
     .page-link {
-      padding: 6px 12px;
+      padding: 5px 11px;
       background: #1e293b;
       border: 1px solid #334155;
       color: #cbd5e1;
@@ -444,14 +431,31 @@
       pointer-events: none;
     }
 
+    /* General Feedback Section */
+    .feedback-section-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+    .star-display {
+      color: #f59e0b;
+      letter-spacing: 2px;
+      font-size: 13px;
+    }
+
     /* Modal */
     .modal {
       display: none;
       position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0, 0, 0, 0.85);
-      backdrop-filter: blur(4px);
-      z-index: 100;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(6px);
+      z-index: 1000;
       align-items: center;
       justify-content: center;
       padding: 20px;
@@ -460,14 +464,12 @@
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: 16px;
-      max-width: 720px;
+      max-width: 650px;
       width: 100%;
       overflow: hidden;
-      animation: modalFade 0.2s ease;
-    }
-    @keyframes modalFade {
-      from { opacity: 0; transform: scale(0.96); }
-      to { opacity: 1; transform: scale(1); }
+      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.6);
+      display: flex;
+      flex-direction: column;
     }
     .modal-header {
       padding: 16px 20px;
@@ -477,44 +479,42 @@
       align-items: center;
     }
     .modal-body {
-      padding: 24px;
+      padding: 20px;
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: 16px;
+      max-height: 80vh;
+      overflow-y: auto;
     }
     .modal-body img {
-      max-height: 440px;
       max-width: 100%;
+      max-height: 380px;
       border-radius: 10px;
-      border: 1px solid #334155;
+      border: 1px solid var(--border);
     }
     .modal-meta {
       width: 100%;
-      background: #0f172a;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 14px;
-      font-size: 12px;
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      color: var(--muted);
-    }
-    .modal-meta strong {
-      color: #cbd5e1;
+      gap: 8px 16px;
+      font-size: 12px;
+      background: #0f172a;
+      padding: 14px;
+      border-radius: 10px;
     }
   </style>
 </head>
 <body>
-  <!-- Top Navbar -->
+  <!-- Admin Navigation -->
   <nav class="navbar">
-    <div class="brand">
+    <div class="brand-section">
       <div class="brand-logo">🛡️</div>
       <div>
-        <div class="brand-title">AI Image Detector</div>
+        <div class="brand-title">Admin Command Console</div>
+        <div style="font-size: 11px; color: var(--muted);">AI Image Detector Operator Portal</div>
       </div>
-      <span class="brand-badge">Admin Console</span>
+      <span class="brand-badge">Owner Only</span>
     </div>
 
     <div class="nav-actions">
@@ -558,7 +558,7 @@
         </div>
         <div class="stat-value">{{ stats.total_submissions }}</div>
         <div class="stat-footer">
-          <span>Logged inputs across all sessions</span>
+          <span>Logged inputs across all user sessions</span>
         </div>
       </div>
 
@@ -568,7 +568,7 @@
           <span class="stat-icon">📷</span>
         </div>
         <div class="stat-value" style="color: #34d399;">
-          {{ stats.real_count }} <span style="font-size: 16px; font-weight: 600; color: var(--muted);">({{ stats.real_percentage }}%)</span>
+          {{ stats.real_count }} <span style="font-size: 15px; font-weight: 600; color: var(--muted);">({{ stats.real_percentage }}%)</span>
         </div>
         <div class="stat-footer">
           <span>Verified authentic photographic uploads</span>
@@ -577,11 +577,11 @@
 
       <div class="stat-card">
         <div class="stat-header">
-          <span>AI-GENERATED (SYNTHETIC)</span>
+          <span>AI-GENERATED</span>
           <span class="stat-icon">🤖</span>
         </div>
         <div class="stat-value" style="color: #fb7185;">
-          {{ stats.fake_count }} <span style="font-size: 16px; font-weight: 600; color: var(--muted);">({{ stats.fake_percentage }}%)</span>
+          {{ stats.fake_count }} <span style="font-size: 15px; font-weight: 600; color: var(--muted);">({{ stats.fake_percentage }}%)</span>
         </div>
         <div class="stat-footer">
           <span>Synthetic neural network generation detected</span>
@@ -598,6 +598,19 @@
         </div>
         <div class="stat-footer">
           <span>Mean model prediction certainty</span>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-header">
+          <span>USER ACCURACY FEEDBACK</span>
+          <span class="stat-icon">💬</span>
+        </div>
+        <div class="stat-value" style="color: #f59e0b;">
+          {{ stats.agreement_rate }}% <span style="font-size: 14px; font-weight: 600; color: var(--muted);">Agreement</span>
+        </div>
+        <div class="stat-footer">
+          <span>{{ stats.feedback_agree }} Agreed &bull; {{ stats.feedback_disagree }} Flagged &bull; {{ stats.general_feedback_count }} General msgs</span>
         </div>
       </div>
     </div>
@@ -618,7 +631,7 @@
       <form method="GET" action="{{ url_for('admin_dashboard') }}" class="filter-form">
         <div class="form-field">
           <label for="search">Search</label>
-          <input type="text" id="search" name="search" value="{{ search_query }}" placeholder="Original filename, IP, or UUID...">
+          <input type="text" id="search" name="search" value="{{ search_query }}" placeholder="Original filename, IP, comment...">
         </div>
 
         <div class="form-field">
@@ -635,8 +648,19 @@
           <select id="training_status" name="training_status">
             <option value="" {% if not training_filter %}selected{% endif %}>All Records</option>
             <option value="none" {% if training_filter == 'none' %}selected{% endif %}>Not in Dataset</option>
-            <option value="train_real" {% if training_filter == 'train_real' %}selected{% endif %}>Added to Train/Real</option>
-            <option value="train_fake" {% if training_filter == 'train_fake' %}selected{% endif %}>Added to Train/Fake</option>
+            <option value="train_real" {% if training_filter == 'train_real' %}selected{% endif %}>In Train/REAL</option>
+            <option value="train_fake" {% if training_filter == 'train_fake' %}selected{% endif %}>In Train/FAKE</option>
+          </select>
+        </div>
+
+        <div class="form-field">
+          <label for="feedback_filter">User Feedback</label>
+          <select id="feedback_filter" name="feedback_filter">
+            <option value="" {% if not feedback_filter %}selected{% endif %}>All Feedback</option>
+            <option value="agree" {% if feedback_filter == 'agree' %}selected{% endif %}>👍 Agreed (Accurate)</option>
+            <option value="disagree" {% if feedback_filter == 'disagree' %}selected{% endif %}>👎 Flagged (Inaccurate)</option>
+            <option value="with_feedback" {% if feedback_filter == 'with_feedback' %}selected{% endif %}>With Feedback Only</option>
+            <option value="none" {% if feedback_filter == 'none' %}selected{% endif %}>No Feedback Given</option>
           </select>
         </div>
 
@@ -669,7 +693,9 @@
     <!-- Submissions Table -->
     <div class="table-container">
       <div class="table-header-bar">
-        <div class="table-title">Submitted Images Audit Log</div>
+        <div class="table-title">
+          <span>📷 Submitted Images & Prediction Audit Log</span>
+        </div>
         <div style="font-size: 13px; color: var(--muted);">
           Total Matching: <strong>{{ pagination.total }}</strong>
         </div>
@@ -682,9 +708,10 @@
               <th>Preview</th>
               <th>ID & Timestamp</th>
               <th>Original File & Size</th>
-              <th>Prediction Verdict</th>
+              <th>Verdict</th>
               <th>Confidence</th>
-              <th>Client IP / Session</th>
+              <th>User Feedback</th>
+              <th>Client IP</th>
               <th>Dataset Status</th>
               <th style="text-align: right;">Actions</th>
             </tr>
@@ -697,14 +724,14 @@
                     <img src="{{ url_for('admin_thumbnail', filename=log.uuid_filename) }}" 
                          alt="Thumbnail" 
                          class="thumbnail"
-                         onclick="openModal('{{ url_for('admin_image', filename=log.uuid_filename) }}', '{{ log.original_filename }}', '{{ log.formatted_size() }}', '{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC') }}', '{{ log.ip_address }}', '{{ log.prediction }}', '{{ log.confidence }}%')">
+                         onclick="openModal('{{ url_for('admin_image', filename=log.uuid_filename) }}', '{{ log.original_filename }}', '{{ log.formatted_size() }}', '{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC') }}', '{{ log.ip_address }}', '{{ log.prediction }}', '{{ log.confidence }}%', '{{ log.user_feedback }}', '{{ log.user_actual_label }}', '{{ log.user_comment }}')">
                   </td>
                   <td>
                     <div style="font-weight: 700; color: #fff;">#{{ log.id }}</div>
-                    <div style="font-size: 11px; color: var(--muted);">{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</div>
+                    <div style="font-size: 11px; color: var(--muted);">{{ log.timestamp.strftime('%Y-%m-%d %H:%M') }}</div>
                   </td>
                   <td>
-                    <div style="max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600;" title="{{ log.original_filename }}">
+                    <div style="max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600;" title="{{ log.original_filename }}">
                       {{ log.original_filename }}
                     </div>
                     <div style="font-size: 11px; color: var(--muted);">{{ log.formatted_size() }}</div>
@@ -716,21 +743,34 @@
                   </td>
                   <td>
                     <div style="font-weight: 700;">{{ "%.1f"|format(log.confidence) }}%</div>
-                    <div style="width: 70px; height: 5px; background: #334155; border-radius: 9999px; margin-top: 4px; overflow: hidden;">
+                    <div style="width: 60px; height: 5px; background: #334155; border-radius: 9999px; margin-top: 4px; overflow: hidden;">
                       <div style="width: {{ log.confidence }}%; height: 100%; background: {{ '#10b981' if log.prediction == 'Real' else '#f43f5e' }};"></div>
                     </div>
                   </td>
                   <td>
+                    {% if log.user_feedback == 'agree' %}
+                      <span class="fb-tag fb-agree" title="User confirmed detection is accurate">👍 Agreed</span>
+                    {% elif log.user_feedback == 'disagree' %}
+                      <span class="fb-tag fb-disagree" title="User says: {{ log.user_actual_label }}{% if log.user_comment %} - Notes: {{ log.user_comment }}{% endif %}">
+                        👎 Flagged: {{ log.user_actual_label or 'Opposite' }}
+                      </span>
+                      {% if log.user_comment %}
+                        <div style="font-size: 11px; color: #cbd5e1; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ log.user_comment }}">
+                          💬 {{ log.user_comment }}
+                        </div>
+                      {% endif %}
+                    {% else %}
+                      <span style="color: var(--muted); font-size: 12px;">—</span>
+                    {% endif %}
+                  </td>
+                  <td>
                     <div style="font-family: monospace; font-size: 12px; color: #cbd5e1;">{{ log.ip_address }}</div>
-                    <div style="font-size: 11px; color: var(--muted);" title="{{ log.session_id }}">
-                      {{ log.session_id[:10] }}...
-                    </div>
                   </td>
                   <td>
                     {% if log.training_status == 'train_real' %}
-                      <span class="status-badge status-train-real">✔ In Train/REAL</span>
+                      <span class="status-badge status-train-real">✔ Train/REAL</span>
                     {% elif log.training_status == 'train_fake' %}
-                      <span class="status-badge status-train-fake">✔ In Train/FAKE</span>
+                      <span class="status-badge status-train-fake">✔ Train/FAKE</span>
                     {% else %}
                       <span class="status-badge status-none">Not Added</span>
                     {% endif %}
@@ -771,7 +811,7 @@
               {% endfor %}
             {% else %}
               <tr>
-                <td colspan="8" style="text-align: center; padding: 48px; color: var(--muted);">
+                <td colspan="9" style="text-align: center; padding: 48px; color: var(--muted);">
                   <div style="font-size: 32px; margin-bottom: 8px;">📭</div>
                   <div>No image submission records match the selected filters.</div>
                 </td>
@@ -789,7 +829,7 @@
 
         <div class="page-nav">
           <!-- Previous Page -->
-          <a href="{{ url_for('admin_dashboard', page=pagination.prev_num, search=search_query, prediction=prediction_filter, training_status=training_filter, sort_by=sort_by, start_date=start_date, end_date=end_date) if pagination.has_prev else '#' }}" 
+          <a href="{{ url_for('admin_dashboard', page=pagination.prev_num, search=search_query, prediction=prediction_filter, training_status=training_filter, feedback_filter=feedback_filter, sort_by=sort_by, start_date=start_date, end_date=end_date) if pagination.has_prev else '#' }}" 
              class="page-link {{ '' if pagination.has_prev else 'disabled' }}">
             &laquo; Prev
           </a>
@@ -797,7 +837,7 @@
           <!-- Page Numbers -->
           {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
             {% if p %}
-              <a href="{{ url_for('admin_dashboard', page=p, search=search_query, prediction=prediction_filter, training_status=training_filter, sort_by=sort_by, start_date=start_date, end_date=end_date) }}" 
+              <a href="{{ url_for('admin_dashboard', page=p, search=search_query, prediction=prediction_filter, training_status=training_filter, feedback_filter=feedback_filter, sort_by=sort_by, start_date=start_date, end_date=end_date) }}" 
                  class="page-link {{ 'active' if p == pagination.page else '' }}">
                 {{ p }}
               </a>
@@ -807,11 +847,82 @@
           {% endfor %}
 
           <!-- Next Page -->
-          <a href="{{ url_for('admin_dashboard', page=pagination.next_num, search=search_query, prediction=prediction_filter, training_status=training_filter, sort_by=sort_by, start_date=start_date, end_date=end_date) if pagination.has_next else '#' }}" 
+          <a href="{{ url_for('admin_dashboard', page=pagination.next_num, search=search_query, prediction=prediction_filter, training_status=training_filter, feedback_filter=feedback_filter, sort_by=sort_by, start_date=start_date, end_date=end_date) if pagination.has_next else '#' }}" 
              class="page-link {{ '' if pagination.has_next else 'disabled' }}">
             Next &raquo;
           </a>
         </div>
+      </div>
+    </div>
+
+    <!-- General User Feedback / Suggestions Table -->
+    <div class="feedback-section-card">
+      <div class="table-header-bar">
+        <div class="table-title">
+          <span>💬 User Voice & Suggestions Inbox</span>
+          <span style="font-size: 12px; color: var(--muted); font-weight: normal;">({{ general_feedbacks|length }} entries)</span>
+        </div>
+      </div>
+
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Rating</th>
+              <th>Category</th>
+              <th>User</th>
+              <th>Message</th>
+              <th>IP</th>
+              <th style="text-align: right;">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if general_feedbacks %}
+              {% for fb in general_feedbacks %}
+                <tr>
+                  <td style="font-size: 11px; color: var(--muted); white-space: nowrap;">
+                    {{ fb.timestamp.strftime('%Y-%m-%d %H:%M') }}
+                  </td>
+                  <td>
+                    <div class="star-display">
+                      {% for i in range(fb.rating) %}★{% endfor %}
+                    </div>
+                  </td>
+                  <td>
+                    <span class="status-badge status-none">{{ fb.category }}</span>
+                  </td>
+                  <td>
+                    <div style="font-weight: 600; color: #fff;">{{ fb.name }}</div>
+                    {% if fb.email %}
+                      <div style="font-size: 11px; color: var(--muted);">{{ fb.email }}</div>
+                    {% endif %}
+                  </td>
+                  <td style="max-width: 380px;">
+                    <div style="color: #e2e8f0; line-height: 1.4;">{{ fb.message }}</div>
+                  </td>
+                  <td style="font-family: monospace; font-size: 11px; color: var(--muted);">
+                    {{ fb.ip_address }}
+                  </td>
+                  <td style="text-align: right;">
+                    <form method="POST" action="{{ url_for('admin_delete_feedback', feedback_id=fb.id) }}" style="margin: 0;" onsubmit="return confirm('Delete this feedback?');">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                      <button type="submit" class="action-btn btn-secondary" style="color: #f87171;" title="Delete Feedback">
+                        🗑️
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+              {% endfor %}
+            {% else %}
+              <tr>
+                <td colspan="7" style="text-align: center; padding: 32px; color: var(--muted);">
+                  No general feedback or suggestions received yet.
+                </td>
+              </tr>
+            {% endif %}
+          </tbody>
+        </table>
       </div>
     </div>
   </main>
@@ -832,6 +943,7 @@
           <div><strong>Client IP:</strong> <span id="metaIp"></span></div>
           <div><strong>Verdict:</strong> <span id="metaVerdict"></span></div>
           <div><strong>Confidence:</strong> <span id="metaConf"></span></div>
+          <div style="grid-column: 1 / -1;"><strong>User Feedback:</strong> <span id="metaFeedback"></span></div>
         </div>
       </div>
     </div>
@@ -882,7 +994,7 @@
     }
 
     // Modal logic
-    function openModal(imgUrl, filename, size, time, ip, verdict, conf) {
+    function openModal(imgUrl, filename, size, time, ip, verdict, conf, userFb, actualLabel, comment) {
       document.getElementById('modalImg').src = imgUrl;
       document.getElementById('modalTitle').textContent = filename;
       document.getElementById('metaFilename').textContent = filename;
@@ -891,6 +1003,15 @@
       document.getElementById('metaIp').textContent = ip;
       document.getElementById('metaVerdict').textContent = verdict;
       document.getElementById('metaConf').textContent = conf;
+
+      let fbText = 'No feedback given';
+      if (userFb === 'agree') {
+        fbText = '👍 User agreed detection was accurate';
+      } else if (userFb === 'disagree') {
+        fbText = '👎 User flagged as incorrect (Claimed: ' + (actualLabel || 'Opposite') + (comment ? ' | Comment: "' + comment + '"' : '') + ')';
+      }
+      document.getElementById('metaFeedback').textContent = fbText;
+
       document.getElementById('imageModal').style.display = 'flex';
     }
 

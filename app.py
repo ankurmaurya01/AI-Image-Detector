@@ -44,9 +44,10 @@ from src.predict import DetectorPredictor
 from src.data_loader import safe_image_loader, get_transforms
 from src.model import build_model
 from src.database import (
-    db, init_db, PredictionLog, UPLOADS_DIR, THUMBNAILS_DIR,
+    db, init_db, PredictionLog, GeneralFeedback, UPLOADS_DIR, THUMBNAILS_DIR,
     record_prediction, is_ip_locked_out, record_login_attempt,
-    get_summary_statistics, move_image_to_dataset, get_failed_attempts_count
+    get_summary_statistics, move_image_to_dataset, get_failed_attempts_count,
+    record_prediction_feedback, record_general_feedback
 )
 from src.auth import init_auth, AdminUser, verify_admin_credentials
 import torch
@@ -226,7 +227,7 @@ def predict():
         session_id = request.cookies.get("session_id") or uuid.uuid4().hex[:16]
 
         try:
-            record_prediction(
+            log_record = record_prediction(
                 uuid_filename=uuid_filename,
                 original_filename=secure_filename(original_filename),
                 file_size=file_size,
@@ -237,6 +238,7 @@ def predict():
                 session_id=session_id,
                 mime_type=file.mimetype or "image/jpeg"
             )
+            result["submission_id"] = log_record.id
         except Exception as db_err:
             print(f"[ERROR] Failed to log prediction to database: {db_err}")
 
@@ -258,6 +260,64 @@ def predict():
                 os.remove(tmp_path)
             except OSError:
                 pass
+
+
+@app.route("/api/feedback", methods=["POST"])
+@csrf.exempt  # Exempt public feedback API
+def api_prediction_feedback():
+    """
+    Public API for users to provide feedback on model prediction accuracy.
+    Accepts JSON: { "submission_id": int, "feedback": "agree"|"disagree", "actual_label": str, "comment": str }
+    """
+    data = request.get_json(silent=True) or request.form.to_dict()
+    submission_id = data.get("submission_id")
+    feedback = data.get("feedback")
+    actual_label = data.get("actual_label", "")
+    comment = data.get("comment", "")
+
+    if not submission_id or not feedback:
+        return jsonify({"status": "error", "message": "Missing submission_id or feedback"}), 400
+
+    try:
+        submission_id = int(submission_id)
+    except (ValueError, TypeError):
+        return jsonify({"status": "error", "message": "Invalid submission_id"}), 400
+
+    success, msg = record_prediction_feedback(
+        log_id=submission_id,
+        feedback=feedback,
+        actual_label=actual_label,
+        comment=comment
+    )
+    if success:
+        return jsonify({"status": "success", "message": msg})
+    return jsonify({"status": "error", "message": msg}), 400
+
+
+@app.route("/api/general-feedback", methods=["POST"])
+@csrf.exempt  # Exempt public feedback API
+def api_general_feedback():
+    """
+    Public API for users to submit suggestions, bug reports, and overall ratings.
+    Accepts JSON: { "name": str, "email": str, "category": str, "rating": int, "message": str }
+    """
+    data = request.get_json(silent=True) or request.form.to_dict()
+    message = (data.get("message") or "").strip()
+    if not message:
+        return jsonify({"status": "error", "message": "Feedback message cannot be empty."}), 400
+
+    client_ip = get_client_ip()
+    success, msg = record_general_feedback(
+        name=data.get("name", "Anonymous"),
+        email=data.get("email", ""),
+        category=data.get("category", "General"),
+        rating=data.get("rating", 5),
+        message=message,
+        ip_address=client_ip
+    )
+    if success:
+        return jsonify({"status": "success", "message": msg})
+    return jsonify({"status": "error", "message": msg}), 400
 
 
 # ==============================================================================
@@ -337,6 +397,7 @@ def admin_dashboard():
     search_query = request.args.get("search", "").strip()
     prediction_filter = request.args.get("prediction", "").strip()
     training_filter = request.args.get("training_status", "").strip()
+    feedback_filter = request.args.get("feedback_filter", "").strip()
     sort_by = request.args.get("sort_by", "newest").strip()
     start_date_str = request.args.get("start_date", "").strip()
     end_date_str = request.args.get("end_date", "").strip()
@@ -351,7 +412,8 @@ def admin_dashboard():
             db.or_(
                 PredictionLog.original_filename.ilike(search_pattern),
                 PredictionLog.ip_address.ilike(search_pattern),
-                PredictionLog.uuid_filename.ilike(search_pattern)
+                PredictionLog.uuid_filename.ilike(search_pattern),
+                PredictionLog.user_comment.ilike(search_pattern)
             )
         )
 
@@ -362,6 +424,16 @@ def admin_dashboard():
     # Training ingestion filter
     if training_filter:
         query = query.filter(PredictionLog.training_status == training_filter)
+
+    # User Feedback filter
+    if feedback_filter == "agree":
+        query = query.filter(PredictionLog.user_feedback == "agree")
+    elif feedback_filter == "disagree":
+        query = query.filter(PredictionLog.user_feedback == "disagree")
+    elif feedback_filter == "with_feedback":
+        query = query.filter(PredictionLog.user_feedback.in_(["agree", "disagree"]))
+    elif feedback_filter == "none":
+        query = query.filter(PredictionLog.user_feedback == "none")
 
     # Date range filters
     if start_date_str:
@@ -395,15 +467,18 @@ def admin_dashboard():
     logs = pagination.items
 
     stats = get_summary_statistics()
+    general_feedbacks = GeneralFeedback.query.order_by(GeneralFeedback.timestamp.desc()).limit(100).all()
 
     return render_template(
         "admin/dashboard.html",
         logs=logs,
         pagination=pagination,
         stats=stats,
+        general_feedbacks=general_feedbacks,
         search_query=search_query,
         prediction_filter=prediction_filter,
         training_filter=training_filter,
+        feedback_filter=feedback_filter,
         sort_by=sort_by,
         start_date=start_date_str,
         end_date=end_date_str
@@ -500,6 +575,20 @@ def admin_delete_log(log_id):
     return redirect(request.referrer or url_for("admin_dashboard"))
 
 
+@app.route("/admin/feedback/delete/<int:feedback_id>", methods=["POST"])
+@login_required
+def admin_delete_feedback(feedback_id):
+    """Permanently delete a general user feedback entry."""
+    fb = db.session.get(GeneralFeedback, feedback_id)
+    if fb:
+        db.session.delete(fb)
+        db.session.commit()
+        flash("Feedback entry deleted.", "success")
+    else:
+        flash("Feedback entry not found.", "warning")
+    return redirect(request.referrer or url_for("admin_dashboard"))
+
+
 @app.route("/admin/export-csv", methods=["GET"])
 @login_required
 def admin_export_csv():
@@ -518,6 +607,9 @@ def admin_export_csv():
         "Confidence (%)",
         "Prob Real (%)",
         "Prob AI-Generated (%)",
+        "User Feedback",
+        "User Claimed Label",
+        "User Comment",
         "Client IP",
         "Session ID",
         "Training Dataset Status"
@@ -534,6 +626,9 @@ def admin_export_csv():
             log.confidence,
             log.prob_real,
             log.prob_fake,
+            log.user_feedback or "none",
+            log.user_actual_label or "",
+            log.user_comment or "",
             log.ip_address,
             log.session_id,
             log.training_status

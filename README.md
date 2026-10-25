@@ -264,8 +264,12 @@ The project includes an **admin-only management portal** at `/admin` designed fo
   - Multi-criteria filtering by verdict (Real vs AI) and date range.
   - Sorting by newest, oldest, confidence, and file size.
   - Low-memory responsive pagination and lazy-loaded thumbnails.
+- **User Feedback & Accuracy Auditing**:
+  - **In-Session Prediction Feedback**: After an image is analyzed, users can vote whether the prediction was accurate (👍 Accurate / 👎 Inaccurate), submit ground-truth corrections (Authentic vs AI), and provide notes (e.g. generator used or visual artifacts).
+  - **General Feedback & Ratings**: Users can submit overall experience ratings (1-5 stars ⭐), category tags (Model Accuracy, Feature Request, Bug Report), and comments.
+  - **Admin Feedback Center**: The admin console includes an agreement KPI card, feedback-based table filtering (allowing instant identification of mispredicted images for retraining), and a dedicated User Voice Inbox.
 - **Training Dataset Ingestion ("Move to Dataset")**: One-click action to transfer submitted images directly into `database/train/REAL` or `database/train/FAKE` for ongoing model fine-tuning and active learning.
-- **Data Export & Deletion**: Export all submission logs as a formatted `.csv` file (`/admin/export-csv`) or permanently purge records along with their stored image files.
+- **Data Export & Deletion**: Export all submission logs as a formatted `.csv` file (`/admin/export-csv`) including all user feedback, claimed labels, and comments, or permanently purge records along with their stored image files.
 - **Multi-User Concurrency**: Built-in threading synchronization locks inference passes so up to 10+ simultaneous users can analyze images concurrently without exceeding Render's 512 MB memory limit.
 
 ---

@@ -37,6 +37,12 @@ class PredictionLog(db.Model):
     training_status = db.Column(db.String(32), default="none")  # 'none', 'train_real', 'train_fake'
     training_moved_at = db.Column(db.DateTime, nullable=True)
 
+    # User Feedback on Prediction
+    user_feedback = db.Column(db.String(32), default="none")  # 'none', 'agree', 'disagree'
+    user_actual_label = db.Column(db.String(32), default="")  # 'Real' or 'AI-generated' if reported by user
+    user_comment = db.Column(db.String(500), default="")      # Optional feedback remarks
+    feedback_timestamp = db.Column(db.DateTime, nullable=True)
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "id": self.id,
@@ -52,6 +58,10 @@ class PredictionLog(db.Model):
             "session_id": self.session_id,
             "timestamp": self.timestamp.strftime("%Y-%m-%d %H:%M:%S UTC") if self.timestamp else "",
             "training_status": self.training_status,
+            "user_feedback": self.user_feedback,
+            "user_actual_label": self.user_actual_label,
+            "user_comment": self.user_comment,
+            "feedback_timestamp": self.feedback_timestamp.strftime("%Y-%m-%d %H:%M:%S UTC") if self.feedback_timestamp else ""
         }
 
     def formatted_size(self) -> str:
@@ -74,6 +84,32 @@ class LoginAttempt(db.Model):
     username = db.Column(db.String(64), nullable=True)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     success = db.Column(db.Boolean, default=False)
+
+
+class GeneralFeedback(db.Model):
+    """Stores user thoughts, bug reports, ratings, and feature suggestions."""
+    __tablename__ = "general_feedback"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), default="Anonymous")
+    email = db.Column(db.String(120), default="")
+    category = db.Column(db.String(64), default="General")  # 'General', 'Accuracy', 'Feature Request', 'Bug Report'
+    rating = db.Column(db.Integer, default=5)  # 1 to 5 stars
+    message = db.Column(db.Text, nullable=False)
+    ip_address = db.Column(db.String(64), default="127.0.0.1")
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "email": self.email,
+            "category": self.category,
+            "rating": self.rating,
+            "message": self.message,
+            "ip_address": self.ip_address,
+            "timestamp": self.timestamp.strftime("%Y-%m-%d %H:%M:%S UTC") if self.timestamp else ""
+        }
 
 
 def init_db(app):
@@ -191,7 +227,7 @@ def record_login_attempt(ip_address: str, username: str, success: bool):
 
 
 def get_summary_statistics() -> Dict[str, Any]:
-    """Compute aggregate counts and percentage breakdown for admin dashboard."""
+    """Compute aggregate counts, feedback metrics, and percentage breakdown for admin dashboard."""
     total = PredictionLog.query.count()
     real_count = PredictionLog.query.filter_by(prediction="Real").count()
     fake_count = PredictionLog.query.filter_by(prediction="AI-generated").count()
@@ -200,6 +236,13 @@ def get_summary_statistics() -> Dict[str, Any]:
     
     real_pct = round((real_count / total * 100.0), 1) if total > 0 else 0.0
     fake_pct = round((fake_count / total * 100.0), 1) if total > 0 else 0.0
+
+    # User feedback metrics
+    feedback_agree = PredictionLog.query.filter_by(user_feedback="agree").count()
+    feedback_disagree = PredictionLog.query.filter_by(user_feedback="disagree").count()
+    feedback_total = feedback_agree + feedback_disagree
+    agreement_rate = round((feedback_agree / feedback_total * 100.0), 1) if feedback_total > 0 else 0.0
+    general_feedback_count = GeneralFeedback.query.count()
 
     # Submissions grouped by date for chart (last 14 days)
     daily_query = db.session.query(
@@ -224,9 +267,67 @@ def get_summary_statistics() -> Dict[str, Any]:
         "real_percentage": real_pct,
         "fake_percentage": fake_pct,
         "average_confidence": round(float(avg_confidence), 1),
+        "feedback_total": feedback_total,
+        "feedback_agree": feedback_agree,
+        "feedback_disagree": feedback_disagree,
+        "agreement_rate": agreement_rate,
+        "general_feedback_count": general_feedback_count,
         "chart_dates": chart_dates,
         "chart_counts": chart_counts
     }
+
+
+def record_prediction_feedback(log_id: int, feedback: str, actual_label: str = "", comment: str = "") -> Tuple[bool, str]:
+    """Store user feedback for a specific prediction result."""
+    log = db.session.get(PredictionLog, log_id)
+    if not log:
+        return False, "Prediction record not found."
+    
+    clean_fb = (feedback or "").strip().lower()
+    if clean_fb not in ("agree", "disagree"):
+        return False, "Feedback must be 'agree' or 'disagree'."
+
+    log.user_feedback = clean_fb
+    log.user_actual_label = (actual_label or "").strip()[:32]
+    log.user_comment = (comment or "").strip()[:500]
+    log.feedback_timestamp = datetime.utcnow()
+    
+    try:
+        db.session.commit()
+        return True, "Feedback recorded successfully."
+    except Exception as e:
+        db.session.rollback()
+        return False, f"Database error: {str(e)}"
+
+
+def record_general_feedback(name: str, email: str, category: str, rating: int, message: str, ip_address: str) -> Tuple[bool, str]:
+    """Save user suggestion, review, or bug report."""
+    msg = (message or "").strip()
+    if not msg:
+        return False, "Feedback message cannot be empty."
+
+    rating_val = max(1, min(5, int(rating or 5)))
+    clean_category = (category or "General").strip()[:64]
+    clean_name = (name or "Anonymous").strip()[:100] or "Anonymous"
+    clean_email = (email or "").strip()[:120]
+
+    entry = GeneralFeedback(
+        name=clean_name,
+        email=clean_email,
+        category=clean_category,
+        rating=rating_val,
+        message=msg[:2000],
+        ip_address=ip_address,
+        timestamp=datetime.utcnow()
+    )
+
+    try:
+        db.session.add(entry)
+        db.session.commit()
+        return True, "Feedback received. Thank you for helping us improve!"
+    except Exception as e:
+        db.session.rollback()
+        return False, f"Failed to save feedback: {str(e)}"
 
 
 def move_image_to_dataset(log_id: int, target_class: str, database_dir: str = "database") -> Tuple[bool, str]:

@@ -37,6 +37,30 @@
       flex-direction: column;
       gap: 24px;
     }
+    .top-bar {
+      display: flex;
+      justify-content: flex-end;
+      width: 100%;
+    }
+    .btn-top-feedback {
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid #334155;
+      color: #cbd5e1;
+      padding: 7px 16px;
+      border-radius: 9999px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .btn-top-feedback:hover {
+      background: #334155;
+      color: white;
+      border-color: #64748b;
+    }
     header {
       text-align: center;
       margin-bottom: 8px;
@@ -246,76 +270,340 @@
     .fill-real { background: linear-gradient(90deg, #059669, #10b981); }
     .fill-fake { background: linear-gradient(90deg, #e11d48, #f43f5e); }
     
+    /* Accuracy Feedback Section */
+    .accuracy-feedback {
+      margin-top: 24px;
+      padding-top: 20px;
+      border-top: 1px solid #1e293b;
+    }
+    .feedback-prompt {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      margin-bottom: 12px;
+    }
+    .feedback-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #f1f5f9;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .feedback-sub {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .feedback-action-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .btn-fb {
+      padding: 8px 16px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .btn-fb-agree {
+      background: rgba(16, 185, 129, 0.12);
+      color: #34d399;
+      border-color: rgba(16, 185, 129, 0.25);
+    }
+    .btn-fb-agree:hover {
+      background: rgba(16, 185, 129, 0.25);
+      transform: translateY(-1px);
+    }
+    .btn-fb-disagree {
+      background: rgba(244, 63, 94, 0.12);
+      color: #fb7185;
+      border-color: rgba(244, 63, 94, 0.25);
+    }
+    .btn-fb-disagree:hover {
+      background: rgba(244, 63, 94, 0.25);
+      transform: translateY(-1px);
+    }
+    .feedback-details {
+      margin-top: 14px;
+      background: rgba(30, 41, 59, 0.6);
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      animation: fadeIn 0.25s ease;
+    }
+    .feedback-input-group label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: #cbd5e1;
+      margin-bottom: 6px;
+    }
+    .label-choice-row {
+      display: flex;
+      gap: 14px;
+      margin-bottom: 8px;
+    }
+    .radio-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: #e2e8f0;
+      cursor: pointer;
+    }
+    .radio-chip input[type="radio"] {
+      display: inline-block;
+      accent-color: var(--primary);
+    }
+    .feedback-details input[type="text"] {
+      width: 100%;
+      background: #0f172a;
+      border: 1px solid #334155;
+      color: #f8fafc;
+      padding: 9px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      outline: none;
+    }
+    .feedback-details input[type="text"]:focus {
+      border-color: var(--primary);
+    }
+    .feedback-submit-row {
+      display: flex;
+      gap: 8px;
+    }
+    .btn-fb-submit {
+      background: var(--primary);
+      color: white;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .btn-fb-submit:hover {
+      background: var(--primary-hover);
+    }
+    .btn-fb-cancel {
+      background: transparent;
+      color: var(--muted);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .btn-fb-cancel:hover {
+      color: white;
+    }
+    .feedback-thanks {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: #34d399;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      animation: fadeIn 0.3s ease;
+    }
+
     /* Privacy Notice Component */
     .privacy-notice {
-      background: rgba(19, 27, 46, 0.6);
-      border: 1px solid #1e293b;
-      border-radius: 14px;
-      padding: 16px 20px;
       display: flex;
       align-items: flex-start;
-      gap: 14px;
+      gap: 12px;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid #1e293b;
+      border-radius: 14px;
+      padding: 14px 18px;
+      font-size: 12px;
       color: var(--muted);
-      font-size: 13px;
       line-height: 1.5;
     }
     .privacy-icon {
-      font-size: 20px;
+      font-size: 16px;
+      color: #818cf8;
       flex-shrink: 0;
-      margin-top: 2px;
+      margin-top: 1px;
     }
     .privacy-content strong {
       color: #cbd5e1;
-      display: block;
-      margin-bottom: 2px;
-      font-size: 13px;
     }
+
     footer {
       text-align: center;
+      font-size: 13px;
       color: #64748b;
-      font-size: 12px;
       margin-top: 10px;
+    }
+
+    /* Modal Styles */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      animation: fadeIn 0.2s ease;
+    }
+    .modal-card {
+      background: #131b2e;
+      border: 1px solid #334155;
+      border-radius: 18px;
+      width: 100%;
+      max-width: 500px;
+      padding: 24px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .modal-header h3 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #f8fafc;
+    }
+    .modal-close-btn {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      font-size: 24px;
+      line-height: 1;
+      padding: 0 4px;
+      cursor: pointer;
+    }
+    .modal-close-btn:hover {
+      color: white;
+    }
+    .modal-sub {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 20px;
+    }
+    .form-group {
+      margin-bottom: 14px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: #cbd5e1;
+      margin-bottom: 6px;
+    }
+    .form-row {
+      display: flex;
+      gap: 12px;
+    }
+    .form-group.half {
+      flex: 1;
+    }
+    .star-rating {
+      display: flex;
+      gap: 6px;
+      font-size: 24px;
+      cursor: pointer;
+    }
+    .star {
+      color: #475569;
+      transition: color 0.15s ease;
+    }
+    .star.selected {
+      color: #f59e0b;
+    }
+    .form-group input, .form-group select, .form-group textarea {
+      width: 100%;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      color: #f8fafc;
+      padding: 10px 14px;
+      font-size: 13px;
+      outline: none;
+    }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+      border-color: var(--primary);
+    }
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 18px;
+    }
+    .general-success {
+      margin-top: 14px;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: #34d399;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      text-align: center;
     }
   </style>
 </head>
 <body>
   <div class="container">
+    <div class="top-bar">
+      <button type="button" class="btn-top-feedback" onclick="openFeedbackModal()">
+        <span>💬</span> Feedback & Suggestions
+      </button>
+    </div>
+
     <header>
-      <div class="badge">PyTorch Deep Learning</div>
+      <div class="badge">Advanced Deep Learning</div>
       <h1>AI-Generated Image Detector</h1>
-      <p class="subtitle">Upload any image to verify if it is authentic or synthetically generated by AI</p>
+      <p class="subtitle">Upload any image to verify if it is authentic camera photography or AI-generated.</p>
     </header>
 
     <div class="main-card">
       <div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()">
         <div class="dropzone-icon">🖼️</div>
-        <div class="dropzone-text">Click to choose or drag & drop an image</div>
+        <div class="dropzone-text">Click to choose image or drag & drop here</div>
         <div class="dropzone-sub">Supports JPG, PNG, WEBP (Max 10 MB)</div>
-        <input type="file" id="fileInput" accept=".jpg,.jpeg,.png,.webp" onchange="handleFile(this.files[0])">
+        <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" onchange="handleFile(this.files[0])">
       </div>
 
       <div class="preview-section" id="previewSection">
         <div class="preview-wrapper">
-          <img id="previewImg" src="" alt="Preview">
+          <img id="previewImg" src="" alt="Upload Preview">
         </div>
         <div class="btn-group">
           <button class="btn-primary" id="analyzeBtn" onclick="analyzeImage()">Analyze Image</button>
-          <button class="btn-secondary" onclick="resetUpload()">Upload Another</button>
+          <button class="btn-secondary" onclick="resetUpload()">Upload Different Image</button>
         </div>
         <div class="loading-spinner" id="spinner">
           <div class="spinner"></div>
-          <span>Processing with ResNet50 neural network...</span>
+          <span>Analyzing visual features and frequency artifacts...</span>
         </div>
       </div>
 
+      <!-- Result Card -->
       <div class="result-card" id="resultCard">
         <div class="result-header">
+          <div class="verdict-tag" id="verdictBadge">Authentic Real</div>
           <div>
-            <div style="font-size: 12px; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; font-weight: 700;">Detection Verdict</div>
-            <div class="verdict-tag" id="verdictBadge">AI-Generated</div>
-          </div>
-          <div style="text-align: right;">
-            <div style="font-size: 12px; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; font-weight: 700;">Confidence</div>
+            <div style="font-size: 11px; text-transform: uppercase; color: var(--muted); font-weight: 700;">Confidence</div>
             <div class="confidence-value" id="confidenceVal">98.5%</div>
           </div>
         </div>
@@ -340,6 +628,52 @@
             </div>
           </div>
         </div>
+
+        <!-- Accuracy Feedback Section -->
+        <div class="accuracy-feedback" id="accuracyFeedbackSection">
+          <div class="feedback-prompt">
+            <span class="feedback-title">🎯 Was this detection accurate?</span>
+            <span class="feedback-sub">Help us refine our neural network by providing your feedback</span>
+          </div>
+
+          <div class="feedback-action-row" id="feedbackActionRow">
+            <button type="button" class="btn-fb btn-fb-agree" onclick="submitAccuracyFeedback('agree')">
+              👍 Accurate
+            </button>
+            <button type="button" class="btn-fb btn-fb-disagree" onclick="toggleDisagreeDetails(true)">
+              👎 Inaccurate
+            </button>
+          </div>
+
+          <!-- Expanding disagree correction form -->
+          <div class="feedback-details" id="feedbackDetails" style="display: none;">
+            <div class="feedback-input-group">
+              <label>What is the true classification?</label>
+              <div class="label-choice-row">
+                <label class="radio-chip">
+                  <input type="radio" name="actualLabel" value="Real" checked> Authentic Photo
+                </label>
+                <label class="radio-chip">
+                  <input type="radio" name="actualLabel" value="AI-generated"> AI-Generated
+                </label>
+              </div>
+            </div>
+            <div class="feedback-input-group">
+              <label>Optional notes / Generator details (e.g. Midjourney, Flux, photographer):</label>
+              <input type="text" id="feedbackComment" placeholder="Explain what looked real or fake...">
+            </div>
+            <div class="feedback-submit-row">
+              <button type="button" class="btn-fb-submit" onclick="submitAccuracyFeedback('disagree')">Submit Feedback</button>
+              <button type="button" class="btn-fb-cancel" onclick="toggleDisagreeDetails(false)">Cancel</button>
+            </div>
+          </div>
+
+          <!-- Thank you message -->
+          <div class="feedback-thanks" id="feedbackThanks" style="display: none;">
+            <span>✨</span>
+            <span id="feedbackThanksMsg">Thank you! Your feedback has been recorded to improve model accuracy.</span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -357,8 +691,68 @@
     </footer>
   </div>
 
+  <!-- General Feedback Modal -->
+  <div class="modal-overlay" id="generalFeedbackModal" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>💬 Share Feedback & Suggestions</h3>
+        <button type="button" class="modal-close-btn" onclick="closeFeedbackModal()">&times;</button>
+      </div>
+      <p class="modal-sub">Tell us about your experience or suggest features for the detector.</p>
+      
+      <form id="generalFeedbackForm" onsubmit="submitGeneralFeedback(event)">
+        <div class="form-group">
+          <label>Overall Experience Rating</label>
+          <div class="star-rating" id="starRating">
+            <span class="star selected" data-value="1">★</span>
+            <span class="star selected" data-value="2">★</span>
+            <span class="star selected" data-value="3">★</span>
+            <span class="star selected" data-value="4">★</span>
+            <span class="star selected" data-value="5">★</span>
+          </div>
+          <input type="hidden" id="ratingValue" value="5">
+        </div>
+
+        <div class="form-group">
+          <label>Category</label>
+          <select id="fbCategory">
+            <option value="Model Accuracy">Model Accuracy & Edge Cases</option>
+            <option value="General Suggestion">General Suggestion</option>
+            <option value="Feature Request">Feature Request</option>
+            <option value="Bug Report">Bug / Issue Report</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Your Feedback <span style="color:#f43f5e;">*</span></label>
+          <textarea id="fbMessage" rows="4" placeholder="What worked well, or what could be improved?" required></textarea>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group half">
+            <label>Name (Optional)</label>
+            <input type="text" id="fbName" placeholder="Your name">
+          </div>
+          <div class="form-group half">
+            <label>Email (Optional)</label>
+            <input type="email" id="fbEmail" placeholder="your@email.com">
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" onclick="closeFeedbackModal()">Cancel</button>
+          <button type="submit" class="btn-primary" id="sendFeedbackBtn">Send Feedback</button>
+        </div>
+        <div id="generalFeedbackSuccess" class="general-success" style="display: none;">
+          ✅ Thank you for your feedback! Your thoughts have been recorded.
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script>
     let selectedFile = null;
+    let currentSubmissionId = null;
     const dropzone = document.getElementById('dropzone');
 
     ['dragenter', 'dragover'].forEach(name => {
@@ -387,6 +781,9 @@
       }
 
       selectedFile = file;
+      currentSubmissionId = null;
+      resetFeedbackUI();
+
       const reader = new FileReader();
       reader.onload = (e) => {
         document.getElementById('previewImg').src = e.target.result;
@@ -399,10 +796,67 @@
 
     function resetUpload() {
       selectedFile = null;
+      currentSubmissionId = null;
       document.getElementById('fileInput').value = '';
       dropzone.style.display = 'block';
       document.getElementById('previewSection').style.display = 'none';
       document.getElementById('resultCard').style.display = 'none';
+      resetFeedbackUI();
+    }
+
+    function resetFeedbackUI() {
+      document.getElementById('feedbackActionRow').style.display = 'flex';
+      document.getElementById('feedbackDetails').style.display = 'none';
+      document.getElementById('feedbackThanks').style.display = 'none';
+      document.getElementById('feedbackComment').value = '';
+    }
+
+    function toggleDisagreeDetails(show) {
+      document.getElementById('feedbackDetails').style.display = show ? 'flex' : 'none';
+      document.getElementById('feedbackActionRow').style.display = show ? 'none' : 'flex';
+    }
+
+    async function submitAccuracyFeedback(feedbackType) {
+      if (!currentSubmissionId) return;
+
+      let actualLabel = '';
+      let comment = '';
+
+      if (feedbackType === 'disagree') {
+        const radios = document.getElementsByName('actualLabel');
+        for (const r of radios) {
+          if (r.checked) actualLabel = r.value;
+        }
+        comment = document.getElementById('feedbackComment').value.trim();
+      }
+
+      try {
+        const res = await fetch('/api/feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            submission_id: currentSubmissionId,
+            feedback: feedbackType,
+            actual_label: actualLabel,
+            comment: comment
+          })
+        });
+
+        const data = await res.json();
+        document.getElementById('feedbackActionRow').style.display = 'none';
+        document.getElementById('feedbackDetails').style.display = 'none';
+        const thanks = document.getElementById('feedbackThanks');
+        const thanksMsg = document.getElementById('feedbackThanksMsg');
+
+        if (feedbackType === 'agree') {
+          thanksMsg.textContent = 'Thank you! Your confirmation helps validate our detection accuracy.';
+        } else {
+          thanksMsg.textContent = 'Feedback recorded! This sample is flagged for review and retraining.';
+        }
+        thanks.style.display = 'flex';
+      } catch (err) {
+        console.error('Feedback submit error:', err);
+      }
     }
 
     async function analyzeImage() {
@@ -413,6 +867,7 @@
       btn.disabled = true;
       spinner.style.display = 'flex';
       document.getElementById('resultCard').style.display = 'none';
+      resetFeedbackUI();
 
       try {
         const formData = new FormData();
@@ -437,11 +892,12 @@
         }
 
         const data = await res.json();
-
         if (data.error) {
           alert('Error: ' + data.error);
           return;
         }
+
+        currentSubmissionId = data.submission_id || null;
 
         const isReal = data.label === 'Real';
         const badge = document.getElementById('verdictBadge');
@@ -459,12 +915,83 @@
         document.getElementById('fakeProb').textContent = fakePct.toFixed(1) + '%';
         document.getElementById('fakeBar').style.width = fakePct + '%';
 
+        // Auto-select opposite choice as default for correction
+        const radios = document.getElementsByName('actualLabel');
+        for (const r of radios) {
+          r.checked = (r.value !== data.label);
+        }
+
         document.getElementById('resultCard').style.display = 'block';
       } catch (err) {
         alert('Analysis failed: ' + err.message);
       } finally {
         btn.disabled = false;
         spinner.style.display = 'none';
+      }
+    }
+
+    // Modal & Star Rating Controls
+    function openFeedbackModal() {
+      document.getElementById('generalFeedbackModal').style.display = 'flex';
+      document.getElementById('generalFeedbackSuccess').style.display = 'none';
+    }
+
+    function closeFeedbackModal() {
+      document.getElementById('generalFeedbackModal').style.display = 'none';
+    }
+
+    // Star rating interactions
+    const stars = document.querySelectorAll('#starRating .star');
+    stars.forEach(star => {
+      star.addEventListener('click', () => {
+        const val = parseInt(star.getAttribute('data-value'));
+        document.getElementById('ratingValue').value = val;
+        stars.forEach(s => {
+          const sVal = parseInt(s.getAttribute('data-value'));
+          if (sVal <= val) {
+            s.classList.add('selected');
+          } else {
+            s.classList.remove('selected');
+          }
+        });
+      });
+    });
+
+    async function submitGeneralFeedback(e) {
+      e.preventDefault();
+      const sendBtn = document.getElementById('sendFeedbackBtn');
+      sendBtn.disabled = true;
+
+      const payload = {
+        name: document.getElementById('fbName').value,
+        email: document.getElementById('fbEmail').value,
+        category: document.getElementById('fbCategory').value,
+        rating: document.getElementById('ratingValue').value,
+        message: document.getElementById('fbMessage').value
+      };
+
+      try {
+        const res = await fetch('/api/general-feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          document.getElementById('generalFeedbackSuccess').style.display = 'block';
+          document.getElementById('generalFeedbackSuccess').textContent = '✅ ' + (data.message || 'Feedback submitted successfully!');
+          document.getElementById('fbMessage').value = '';
+          setTimeout(() => {
+            closeFeedbackModal();
+          }, 2000);
+        } else {
+          alert('Error: ' + (data.message || 'Could not submit feedback.'));
+        }
+      } catch (err) {
+        alert('Error: ' + err.message);
+      } finally {
+        sendBtn.disabled = false;
       }
     }
   </script>
